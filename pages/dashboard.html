@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <script>(function(){try{if(localStorage.getItem('familycare-theme')==='dark')document.documentElement.classList.add('dark-theme');}catch(e){}})();</script>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Dashboard - FamilyCare</title>
+ <link rel="stylesheet" href="../styles/common.css">
+ <link rel="stylesheet" href="../styles/dashboard.css">
+ <link rel="stylesheet" href="../styles/treatment.css">
+</head>
+<body>
+<div class="app-shell">
+ <aside class="sidebar">
+  <a class="brand" href="dashboard.html"><img src="../assets/logo.svg" alt="FamilyCare"><div><div class="brand-title">FamilyCare</div><div class="brand-subtitle">by Cademix</div><div class="brand-version">v1.0.66</div></div></a>
+  <button class="menu-toggle" type="button" id="menuToggle" title="Restrânge meniul">☰</button>
+  <nav class="nav"><a class="active" href="dashboard.html"><span class="ico">🏠</span><span>Dashboard</span></a>
+<a href="journal.html"><span class="ico">📝</span><span>Jurnal</span></a>
+<a href="config.html"><span class="ico">⚙️</span><span>Configurări</span></a>
+<a href="https://localhost:31001/pages/senior-login.html" target="_blank"><span class="ico">👤</span><span>Ecran senior</span></a></nav>
+  <div class="theme-switch"><button class="btn-light" type="button" data-theme="light">Light</button><button class="btn-dark" type="button" data-theme="dark">Dark</button></div>
+ </aside>
+ <main class="main">
+  <div class="topbar">
+   <div><div class="eyebrow">FamilyCare by Cademix</div><h1 class="page-title">Dashboard</h1><div class="now-chip" id="nowInfo">Azi · --:--</div></div>
+   <div class="context-card"><div class="context-row"><div><span class="muted">Care Header ID</span><br><b>CH-RO-0001</b></div><span class="pill">Familie proprie</span></div><div class="context-selects"><select><option>Părinții mei</option><option>Familia mea</option><option>Părinții soției</option></select><select id="contextSeniorSelect"><option>Seniori</option></select></div></div>
+  </div>
+
+  <section class="section dashboard-seniors-section">
+   <div class="section-head-inline"><h2 class="section-title">Seniori</h2><div class="header-actions"><a class="btn" href="config.html?section=senior-card-colors">Culori carduri</a><button class="btn primary" id="openTreatmentModal" type="button">Adaugă tratament</button><button class="btn" id="openAgendaModal" type="button">Adaugă agendă</button></div></div>
+   <div class="dashboard-senior-cards" id="dashboardSeniorCards"></div>
+  </section>
+
+  <section class="section card" id="seniorDetailCard">
+   <div class="section-head-inline"><div><h2 class="section-title" id="detailTitle">Detalii senior</h2><p class="muted" id="detailSubtitle">Alege un senior pentru a vedea tratamentele și agenda.</p></div><a class="btn primary" target="_blank" href="https://localhost:31001/pages/senior-login.html">Deschide ecran senior</a></div>
+   <div class="grid-3 dashboard-info-grid">
+    <div class="info-box"><b>Următorul tratament</b><div id="detailNextTreatment" class="big-info">-</div></div>
+    <div class="info-box"><b>Tratamente azi</b><div id="detailTodayCount" class="big-info">0</div></div>
+    <div class="info-box"><b>Activități azi</b><div id="detailAgendaCount" class="big-info">0</div></div>
+   </div>
+   <div class="grid-2" style="margin-top:16px">
+    <div><h3 class="mini-title">Plan tratament</h3><div class="table-wrap"><table><thead><tr><th>Ora</th><th>Tratament</th><th>Regulă</th><th>Acțiuni</th></tr></thead><tbody id="selectedTreatmentBody"><tr><td colspan="4">Nu există date.</td></tr></tbody></table></div></div>
+    <div><h3 class="mini-title">Agendă</h3><div class="table-wrap"><table><thead><tr><th>Ora</th><th>Activitate</th><th>Detalii</th></tr></thead><tbody id="selectedAgendaBody"><tr><td colspan="3">Nu există date.</td></tr></tbody></table></div></div>
+   </div>
+  </section>
+
+  <section class="section card"><h2 class="section-title">Recomandări medic</h2><div class="info-box"><b>Control cardiologie</b> · programare în următoarele 30 zile<br><b>Monitorizare tensiune</b> · task recurent zilnic<br><b>Regim alimentar</b> · sare redusă, hidratare.</div></section>
+ </main>
+</div>
+
+<div class="app-modal-backdrop" id="modalBackdrop" hidden>
+ <div class="app-modal" role="dialog" aria-modal="true">
+  <div class="modal-head"><h2 id="modalTitle">Adaugă</h2><button class="btn" id="closeModal" type="button">Închide</button></div>
+  <div id="treatmentModalContent">
+   <div class="form-grid">
+    <div class="field full"><label>Seniori</label><select id="seniorMultiSelect" class="senior-multiselect" multiple size="5"></select></div>
+    <div class="field"><label>Tip tratament</label><select id="treatmentType"><option value="medication">Medicament</option><option value="measurement">Măsurare</option><option value="procedure">Procedură</option></select></div>
+    <div class="field treatment-name-field"><label>Denumire</label><input id="treatmentName" list="treatmentNames" value="Pastila de tensiune" autocomplete="off"><datalist id="treatmentNames"></datalist><div id="treatmentNameMenu" class="treatment-name-menu" hidden></div></div>
+    <div class="field"><label>Doză / cantitate</label><input id="treatmentDose" value="1 comprimat"></div>
+    <div class="field full"><label>Instrucțiuni</label><input id="instructions" value="După masă. Confirmare pe ecranul senior/senioră."></div>
+    <div class="field"><label>Începe la</label><input id="startDate" type="date"></div>
+    <div class="field"><label>Până la</label><input id="endDate" type="date"></div>
+    <div class="field"><label>Ora</label><input id="startTime" type="time"></div>
+    <div class="field"><label>Se repetă</label><select id="repeatRule"><option value="selected_weekdays">Zile selectate</option><option value="daily">Zilnic</option><option value="every_x_days">La X zile</option><option value="once">O singură dată</option></select></div>
+    <div class="field"><label>Interval la X zile</label><input id="repeatEvery" type="number" min="1" value="1"></div>
+    <div class="field"><label>Escaladare după minute</label><input id="escalationMinutes" type="number" min="1" value="30"></div>
+    <div class="field full"><label>Zile active</label><div class="checkbox-row weekdays"><label class="check-pill"><input type="checkbox" value="1">Luni</label><label class="check-pill"><input type="checkbox" value="2">Marți</label><label class="check-pill"><input type="checkbox" value="3">Miercuri</label><label class="check-pill"><input type="checkbox" value="4">Joi</label><label class="check-pill"><input type="checkbox" value="5">Vineri</label><label class="check-pill"><input type="checkbox" value="6">Sâmbătă</label><label class="check-pill"><input type="checkbox" value="7">Duminică</label></div></div>
+    <div class="field full"><label>Email notificare</label><div class="checkbox-row"><label class="check-pill"><input type="checkbox" id="emailCreate" checked>La creare</label><label class="check-pill"><input type="checkbox" id="emailFinish">La finalizare</label><label class="check-pill"><input type="checkbox" id="emailBefore" checked>Cu 10 minute înainte</label></div></div>
+    <div class="field full"><label>Destinatari email</label><input id="emailRecipients" type="email" placeholder="contact@example.com"></div>
+   </div><div id="treatmentSaveResult" class="action-result"></div>
+   <div class="modal-actions"><button class="btn primary" id="saveTreatment" type="button">Salvează tratament</button></div>
+  </div>
+  <div id="agendaModalContent" hidden>
+   <div class="form-grid">
+    <div class="field full"><label>Seniori</label><select id="agendaSeniorSelect" class="senior-multiselect" multiple size="5"></select></div>
+    <div class="field"><label>Activitate</label><input id="agendaTitle" value="Vizită îngrijitor"></div>
+    <div class="field"><label>Ora</label><input id="agendaTime" type="time"></div>
+    <div class="field full"><label>Detalii</label><input id="agendaDetails" value="Confirmare pe dashboard și în jurnal."></div>
+   </div>
+   <div id="agendaSaveResult" class="action-result"></div>
+   <div class="modal-actions"><button class="btn primary" id="saveAgenda" type="button">Salvează activitate</button></div>
+  </div>
+ </div>
+</div>
+
+<div class="app-choice-backdrop" id="appChoiceBackdrop" hidden>
+ <div class="app-choice-card">
+  <h3 id="appChoiceTitle">Confirmare</h3>
+  <p id="appChoiceMessage"></p>
+  <div class="app-choice-actions">
+   <button class="btn" id="appChoiceCancel" type="button">Nu</button>
+   <button class="btn primary" id="appChoiceOk" type="button">Da</button>
+  </div>
+ </div>
+</div>
+
+<script>
+(function(){const KEY='familycare-theme';const apply=t=>{document.documentElement.classList.toggle('dark-theme',t==='dark');document.body.classList.toggle('dark-theme',t==='dark');localStorage.setItem(KEY,t);document.querySelectorAll('[data-theme]').forEach(b=>b.classList.toggle('active',b.dataset.theme===t));};apply(localStorage.getItem(KEY)==='dark'?'dark':'light');document.querySelectorAll('[data-theme]').forEach(b=>b.onclick=()=>apply(b.dataset.theme));})();
+(function(){const key='familycare-menu-collapsed';const shell=document.querySelector('.app-shell');const btn=document.getElementById('menuToggle');function apply(v){if(shell)shell.classList.toggle('menu-collapsed',v==='1')}apply(localStorage.getItem(key)||(window.innerWidth<=1000?'1':'0'));if(btn)btn.onclick=()=>{const next=shell.classList.contains('menu-collapsed')?'0':'1';localStorage.setItem(key,next);apply(next)}})();
+</script>
+<script>
+const WEEKDAYS={1:'Luni',2:'Marți',3:'Miercuri',4:'Joi',5:'Vineri',6:'Sâmbătă',7:'Duminică'};
+const FALLBACK_ENTITIES=[{entity_code:'ME-0001',name:'Maria Popescu',entity_type:'senioră',branch_code:'CB-0001',branch_name:'Părinții mei'},{entity_code:'ME-0003',name:'Ion Popescu',entity_type:'senior',branch_code:'CB-0001',branch_name:'Părinții mei'}];
+let entities=[], treatments=[], agendaItems=[], selectedEntityCode='', editTreatmentId=null;
+let knownTreatmentNames=['Pastila de tensiune','Furazolidon','Paracetamol','Aspirina','Vitamina D','Măsurare tensiune'];
+function pad(n){return String(n).padStart(2,'0')} function jsWeekday(d){const n=d.getDay();return n===0?7:n} function todayIso(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())} function addMonthsIso(m){const d=new Date();d.setMonth(d.getMonth()+m);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())} function currentTimeRounded(){const d=new Date();d.setMinutes(d.getMinutes()+10);d.setMinutes(Math.ceil(d.getMinutes()/5)*5,0,0);return pad(d.getHours())+':'+pad(d.getMinutes())} function safe(v){return String(v??'').replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]))}
+function updateNow(){const d=new Date();document.getElementById('nowInfo').innerHTML=`Azi <b>${WEEKDAYS[jsWeekday(d)]}, ${d.toLocaleDateString('ro-RO')} · ${pad(d.getHours())}:${pad(d.getMinutes())}</b>`} setInterval(updateNow,30000); updateNow();
+function mergeEntities(rows){const map=new Map();[...FALLBACK_ENTITIES,...(Array.isArray(rows)?rows:[])].filter(e=>/senior|senioră|seniora/i.test(String(e.entity_type||''))).forEach(e=>map.set(e.entity_code,{...(map.get(e.entity_code)||{}),...e})); return [...map.values()];}
+async function loadEntities(){let rows=[];try{const r=await fetch('/api/entities?ts='+Date.now());if(r.ok)rows=await r.json();}catch(e){} entities=mergeEntities(rows); selectedEntityCode=selectedEntityCode||entities[0]?.entity_code||''; renderSeniorCards(); renderMultiSelects(); renderContextSelect(); renderSelectedDetails();}
+function renderContextSelect(){const s=document.getElementById('contextSeniorSelect'); s.innerHTML=entities.map(e=>`<option ${e.entity_code===selectedEntityCode?'selected':''}>${safe(e.name)} · ${safe(e.entity_type)}</option>`).join('');}
+function renderSeniorCards(){const box=document.getElementById('dashboardSeniorCards'); box.innerHTML=entities.map(e=>`<button type="button" class="dashboard-senior-card ${e.entity_code===selectedEntityCode?'active':''}" data-code="${safe(e.entity_code)}"><b>${safe(e.name)}</b><span>${safe(e.entity_type)} · ${safe(e.branch_name||'Părinții mei')}</span></button>`).join(''); box.querySelectorAll('button').forEach(b=>b.onclick=()=>{selectedEntityCode=b.dataset.code;renderSeniorCards();renderContextSelect();renderSelectedDetails();});}
+function renderMultiSelects(){const html=entities.map(e=>`<option value="${safe(e.entity_code)}" ${e.entity_code===selectedEntityCode?'selected':''}>${safe(e.name)} · ${safe(e.entity_type)}</option>`).join(''); document.getElementById('seniorMultiSelect').innerHTML=html; document.getElementById('agendaSeniorSelect').innerHTML=html;}
+function dateOnly(s){if(!s)return null; const d=new Date(String(s).slice(0,10)+'T00:00:00'); return isNaN(d)?null:d;}
+function parseTime(t){const [h,m]=String(t||'09:00').slice(0,5).split(':').map(Number);return {h:h||0,m:m||0};}
+function isValidForToday(item){const d=new Date(); const start=dateOnly(item.start_date)||d; const end=dateOnly(item.end_date); const day=new Date(d.getFullYear(),d.getMonth(),d.getDate()); if(day<start||(end&&day>end))return false; const rule=item.recurrence_rule||'selected_weekdays'; const days=String(item.active_weekdays||'').split(',').map(Number).filter(Boolean); const every=Math.max(1,Number(item.repeat_every_days||1)); if(rule==='daily')return true; if(rule==='once')return day.toDateString()===start.toDateString(); if(rule==='every_x_days')return Math.floor((day-start)/86400000)%every===0; return !days.length||days.includes(jsWeekday(day));}
+function occurrence(item){const {h,m}=parseTime(item.start_time); const t=new Date(); t.setHours(h,m,0,0); return t;}
+function ruleLabel(x){if(x.recurrence_rule==='daily')return'Zilnic'; if(x.recurrence_rule==='every_x_days')return'Din '+(x.repeat_every_days||1)+' în '+(x.repeat_every_days||1)+' zile'; if(x.recurrence_rule==='once')return'O singură dată'; return String(x.active_weekdays||'').split(',').filter(Boolean).map(d=>WEEKDAYS[d]).join(', ')||'Zile selectate';}
+function timeLabel(t){return String(t||'').slice(0,5)||'-';}
+async function loadTreatments(){try{const r=await fetch('/api/treatment?ts='+Date.now());treatments=r.ok?await r.json():[];}catch(e){treatments=[];} mergeTreatmentNamesFromPlan(); renderTreatmentNames(); renderSelectedDetails();}
+async function loadAgenda(){try{const r=await fetch('/api/agenda?ts='+Date.now());agendaItems=r.ok?await r.json():[];}catch(e){agendaItems=[];} renderSelectedDetails();}
+function renderSelectedDetails(){
+ const e=entities.find(x=>x.entity_code===selectedEntityCode)||entities[0];
+ if(!e)return;
+ const todayTreat=(treatments||[]).filter(t=>t.entity_code===e.entity_code && isValidForToday(t)).sort((a,b)=>occurrence(a)-occurrence(b));
+ const todayAgenda=(agendaItems||[]).filter(t=>t.entity_code===e.entity_code && isValidForToday(t)).sort((a,b)=>occurrence(a)-occurrence(b));
+ document.getElementById('detailTitle').textContent=e.name;
+ document.getElementById('detailSubtitle').textContent=`${e.entity_type} · ${e.branch_name||'Părinții mei'}`;
+ const next=todayTreat[0];
+ document.getElementById('detailNextTreatment').textContent=next?`${timeLabel(next.start_time)} · ${next.title}`:'-';
+ document.getElementById('detailTodayCount').textContent=todayTreat.length;
+ document.getElementById('detailAgendaCount').textContent=todayAgenda.length;
+ document.getElementById('selectedTreatmentBody').innerHTML=todayTreat.length?todayTreat.map(t=>`<tr><td>${timeLabel(t.start_time)}</td><td><b>${safe(t.title)}</b><br><span class="muted">${safe(t.description||'')}</span></td><td>${safe(ruleLabel(t))}</td><td class="row-actions"><button class="mini-action" data-edit-treatment="${safe(t.id)}" type="button">Modifică</button><button class="mini-action danger" data-cancel-treatment="${safe(t.id)}" type="button">Anulează</button></td></tr>`).join(''):'<tr><td colspan="4">Nu există tratamente azi.</td></tr>';
+ document.getElementById('selectedAgendaBody').innerHTML=todayAgenda.length?todayAgenda.map(t=>`<tr><td>${timeLabel(t.start_time)}</td><td><b>${safe(t.title)}</b></td><td>${safe(t.description||'')}</td></tr>`).join(''):'<tr><td colspan="3">Nu există activități azi.</td></tr>';
+ bindTreatmentRowActions();
+}
+function bindTreatmentRowActions(){
+ document.querySelectorAll('[data-edit-treatment]').forEach(btn=>btn.onclick=()=>openTreatmentEditor(btn.dataset.editTreatment));
+ document.querySelectorAll('[data-cancel-treatment]').forEach(btn=>btn.onclick=async()=>{
+   const id=btn.dataset.cancelTreatment;
+   const ok=await showAppChoice('Anulezi tratamentul?', 'Tratamentul nu va mai apărea în plan și pe ecranul senior.', 'Anulează tratamentul', 'Renunță');
+   if(!ok)return;
+   try{const r=await fetch('/api/treatment/'+encodeURIComponent(id),{method:'DELETE'}); if(!r.ok) throw new Error(await r.text()); await loadTreatments();}
+   catch(e){alertInline('Nu s-a putut anula: '+e.message, true);}
+ });
+}
+function alertInline(message,isError=false){const result=document.getElementById('treatmentSaveResult'); if(!result)return; result.textContent=message; result.className='action-result show '+(isError?'error':'success');}
+
+function initDefaults(){document.getElementById('startDate').value=todayIso();document.getElementById('endDate').value=addMonthsIso(6);document.getElementById('startTime').value=currentTimeRounded();document.getElementById('agendaTime').value=currentTimeRounded(); const today=String(jsWeekday(new Date()));document.querySelectorAll('.weekdays input').forEach(i=>i.checked=i.value===today);} function selectedWeekdays(){return Array.from(document.querySelectorAll('.weekdays input:checked')).map(x=>x.value).join(',');}
+function renderTreatmentNames(){document.getElementById('treatmentNames').innerHTML=[...new Set(knownTreatmentNames)].sort((a,b)=>a.localeCompare(b,'ro')).map(n=>`<option value="${safe(n)}"></option>`).join(''); renderTreatmentNameMenu(false);}
+function mergeTreatmentNamesFromPlan(){(treatments||[]).forEach(t=>{const n=String(t.title||'').trim(); if(n&&!knownTreatmentNames.some(x=>x.toLowerCase()===n.toLowerCase()))knownTreatmentNames.push(n);});}
+function renderTreatmentNameMenu(show=true){const input=document.getElementById('treatmentName');const menu=document.getElementById('treatmentNameMenu'); if(!input||!menu)return; const q=input.value.trim().toLowerCase(); const names=[...new Set(knownTreatmentNames)].sort((a,b)=>a.localeCompare(b,'ro')).filter(n=>!q||n.toLowerCase().includes(q)).slice(0,10); if(!show||!names.length){menu.hidden=true;menu.innerHTML='';return;} menu.innerHTML=names.map(n=>`<button type="button" data-name="${safe(n)}">${safe(n)}</button>`).join(''); menu.hidden=false; menu.querySelectorAll('button').forEach(b=>b.onclick=()=>{input.value=b.dataset.name;menu.hidden=true;});}
+async function loadTreatmentNameCatalog(){try{const r=await fetch('/api/config/treatment-names?ts='+Date.now()); if(!r.ok)return; const rows=await r.json(); (rows||[]).forEach(row=>{const p=row.payload||{}; const n=String(p.Denumire||p.denumire||p.Nume||p.name||'').trim(); if(n&&!knownTreatmentNames.some(x=>x.toLowerCase()===n.toLowerCase())) knownTreatmentNames.push(n);}); renderTreatmentNames();}catch(e){}}
+function initTreatmentNamePicker(){const input=document.getElementById('treatmentName'); if(!input)return; input.addEventListener('focus',()=>renderTreatmentNameMenu(true)); input.addEventListener('input',()=>renderTreatmentNameMenu(true)); document.addEventListener('click',e=>{if(!e.target.closest('.treatment-name-field'))renderTreatmentNameMenu(false);});}
+
+function showAppChoice(title,message,okText='Da',cancelText='Nu'){
+ return new Promise(resolve=>{
+  const bg=document.getElementById('appChoiceBackdrop');
+  document.getElementById('appChoiceTitle').textContent=title;
+  document.getElementById('appChoiceMessage').textContent=message;
+  const ok=document.getElementById('appChoiceOk'); const cancel=document.getElementById('appChoiceCancel');
+  ok.textContent=okText; cancel.textContent=cancelText; bg.hidden=false;
+  const cleanup=(val)=>{bg.hidden=true; ok.onclick=null; cancel.onclick=null; resolve(val);};
+  ok.onclick=()=>cleanup(true); cancel.onclick=()=>cleanup(false); bg.onclick=(ev)=>{if(ev.target===bg)cleanup(false)};
+ });
+}
+
+async function maybeAddTreatmentName(name){
+ const norm=name.trim().toLowerCase();
+ if(!norm||knownTreatmentNames.some(x=>x.trim().toLowerCase()===norm))return true;
+ const ok=await showAppChoice('Tratament nou', `„${name}” nu există în lista de tratamente. Îl adaugi în listă?`, 'Adaugă în listă', 'Nu adaug');
+ if(!ok)return false;
+ try{await fetch('/api/config/treatment-names',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({Denumire:name,Tip:document.getElementById('treatmentType').value})});}catch(e){}
+ knownTreatmentNames.push(name);renderTreatmentNames();return true;
+}
+function resetTreatmentForm(){
+ editTreatmentId=null;
+ document.getElementById('modalTitle').textContent='Adaugă tratament';
+ document.getElementById('saveTreatment').textContent='Salvează tratament';
+ document.getElementById('treatmentSaveResult').textContent='';
+ document.getElementById('treatmentSaveResult').className='action-result';
+ renderMultiSelects();
+ initDefaults();
+}
+function openTreatmentEditor(id){
+ const t=(treatments||[]).find(x=>String(x.id)===String(id)); if(!t)return;
+ openModal('treatment', true);
+ editTreatmentId=t.id;
+ document.getElementById('modalTitle').textContent='Modifică tratament';
+ document.getElementById('saveTreatment').textContent='Salvează modificările';
+ renderMultiSelects();
+ Array.from(document.getElementById('seniorMultiSelect').options).forEach(o=>o.selected=o.value===t.entity_code);
+ document.getElementById('treatmentType').value=t.task_type||'medication';
+ document.getElementById('treatmentName').value=t.title||'';
+ const parts=String(t.description||'').split(' · ');
+ document.getElementById('treatmentDose').value=parts[1]||'';
+ document.getElementById('instructions').value=parts.slice(2).join(' · ')||'';
+ document.getElementById('startDate').value=String(t.start_date||'').slice(0,10);
+ document.getElementById('endDate').value=String(t.end_date||'').slice(0,10);
+ document.getElementById('startTime').value=String(t.start_time||'09:00').slice(0,5);
+ document.getElementById('repeatRule').value=t.recurrence_rule||'selected_weekdays';
+ document.getElementById('repeatEvery').value=t.repeat_every_days||1;
+ document.getElementById('escalationMinutes').value=t.escalation_minutes||30;
+ const days=String(t.active_weekdays||'').split(',');
+ document.querySelectorAll('.weekdays input').forEach(i=>i.checked=days.includes(i.value));
+ document.getElementById('emailCreate').checked=!!t.email_on_create;
+ document.getElementById('emailFinish').checked=!!t.email_on_finish;
+ document.getElementById('emailRecipients').value=t.email_recipients||'';
+}
+function openModal(type, keepForm=false){document.getElementById('modalBackdrop').hidden=false; document.getElementById('modalTitle').textContent=type==='agenda'?'Adaugă agendă':'Adaugă tratament'; document.getElementById('treatmentModalContent').hidden=type==='agenda'; document.getElementById('agendaModalContent').hidden=type!=='agenda'; if(type!=='agenda'&&!keepForm) resetTreatmentForm();}
+function closeModal(){document.getElementById('modalBackdrop').hidden=true;}
+document.getElementById('openTreatmentModal').onclick=()=>openModal('treatment'); document.getElementById('openAgendaModal').onclick=()=>openModal('agenda'); document.getElementById('closeModal').onclick=closeModal; document.getElementById('modalBackdrop').onclick=e=>{if(e.target.id==='modalBackdrop')closeModal();};
+document.getElementById('saveTreatment').onclick=async()=>{
+ const result=document.getElementById('treatmentSaveResult');
+ const entityCodes=Array.from(document.getElementById('seniorMultiSelect').selectedOptions).map(x=>x.value);
+ const treatmentName=document.getElementById('treatmentName').value.trim();
+ if(!entityCodes.length){result.textContent='Alege cel puțin un senior.';result.className='action-result show error';return;}
+ if(!treatmentName){result.textContent='Completează denumirea.';result.className='action-result show error';return;}
+ if(!(await maybeAddTreatmentName(treatmentName)))return;
+ const payload={entityCodes,treatmentType:document.getElementById('treatmentType').value,treatmentName,dose:document.getElementById('treatmentDose').value.trim(),responsible:'Seniori',instructions:document.getElementById('instructions').value.trim(),startDate:document.getElementById('startDate').value,endDate:document.getElementById('endDate').value,startTime:document.getElementById('startTime').value,recurrenceRule:document.getElementById('repeatRule').value,repeatEveryDays:document.getElementById('repeatEvery').value,activeWeekdays:selectedWeekdays(),escalationMinutes:document.getElementById('escalationMinutes').value,emailOnCreate:document.getElementById('emailCreate').checked,emailOnFinish:document.getElementById('emailFinish').checked,emailBefore:document.getElementById('emailBefore').checked,emailRecipients:document.getElementById('emailRecipients').value.trim()};
+ try{
+  const url=editTreatmentId?'/api/treatment/'+encodeURIComponent(editTreatmentId):'/api/treatment';
+  const method=editTreatmentId?'PUT':'POST';
+  const r=await fetch(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!r.ok)throw new Error(await r.text());
+  let savedInfo={};
+  try{ savedInfo=await r.clone().json(); }catch(_){ }
+  let emailText='';
+  if(savedInfo.email_sent) emailText=' Email trimis.';
+  else if(savedInfo.email_status) emailText=' Email: '+savedInfo.email_status+'.';
+  else if(savedInfo.email_queued) emailText=' Notificarea este în Mail Center.';
+  result.textContent=(editTreatmentId?'Modificările au fost salvate.':'Tratamentul a fost salvat.') + emailText;
+  result.className='action-result show success';
+  await loadTreatments();
+  if(editTreatmentId){setTimeout(closeModal,450);}
+ }catch(e){result.textContent='Nu s-a putut salva: '+e.message;result.className='action-result show error';}
+};
+document.getElementById('saveAgenda').onclick=async()=>{const result=document.getElementById('agendaSaveResult'); const entityCodes=Array.from(document.getElementById('agendaSeniorSelect').selectedOptions).map(x=>x.value); const title=document.getElementById('agendaTitle').value.trim(); if(!entityCodes.length||!title){result.textContent='Alege seniori și completează activitatea.';result.className='action-result show error';return;} const payload={entityCodes,title,description:document.getElementById('agendaDetails').value.trim(),startDate:todayIso(),endDate:addMonthsIso(6),startTime:document.getElementById('agendaTime').value,recurrenceRule:'selected_weekdays',activeWeekdays:String(jsWeekday(new Date())),repeatEveryDays:1}; try{const r=await fetch('/api/agenda',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); if(!r.ok)throw new Error(await r.text()); result.textContent='Activitatea a fost salvată.';result.className='action-result show success'; await loadAgenda();}catch(e){result.textContent='Nu s-a putut salva: '+e.message;result.className='action-result show error';}};
+initDefaults(); renderTreatmentNames(); initTreatmentNamePicker(); loadTreatmentNameCatalog(); loadEntities().then(()=>Promise.all([loadTreatments(),loadAgenda()]));
+</script>
+</body>
+</html>

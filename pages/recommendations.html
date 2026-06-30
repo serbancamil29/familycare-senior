@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <script>
+(function(){
+  try {
+    if (localStorage.getItem('familycare-theme') === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+    }
+  } catch (e) {}
+})();
+</script>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Recomandări medic - FamilyCare</title>
+ <link rel="stylesheet" href="../styles/common.css">
+ <link rel="stylesheet" href="../styles/recommendations.css">
+</head>
+<body>
+<div class="app-shell">
+ <aside class="sidebar">
+  <a class="brand" href="dashboard.html">
+   <img src="../assets/logo.svg" alt="FamilyCare logo">
+   <div><div class="brand-title">FamilyCare</div><div class="brand-subtitle">by Cademix</div><div class="brand-version">v1.0.66</div></div>
+  </a>
+  <button class="menu-toggle" type="button" id="menuToggle" title="Restrânge meniul">☰</button>
+  <nav class="nav"><a class="active" href="dashboard.html"><span class="ico">🏠</span><span>Dashboard</span></a>
+<a class="" href="journal.html"><span class="ico">📝</span><span>Jurnal</span></a>
+<a class="" href="config.html"><span class="ico">⚙️</span><span>Configurări</span></a>
+<a class="" href="https://localhost:31001/pages/senior-login.html" target="_blank"><span class="ico">👤</span><span>Ecran senior</span></a></nav>
+  <div class="theme-switch" aria-label="Teme"><button class="btn-light" type="button" data-theme="light">Light</button><button class="btn-dark" type="button" data-theme="dark">Dark</button></div>
+ </aside>
+ <main class="main">
+  <div class="topbar">
+   <div>
+    <div class="eyebrow">FamilyCare by Cademix</div>
+    <h1 class="page-title">Recomandări medic</h1>
+    <p class="page-lead">Recomandările medicului pot genera taskuri recurente, fără ca aplicația să dea diagnostic.</p>
+   </div>
+   <div class="context-card">
+    <div class="context-row"><div><span class="muted">Care Header ID</span><br><b>CH-RO-0001</b></div><span class="pill">Familie proprie</span></div>
+    <div class="context-selects"><select><option>Părinții mei</option><option>Familia mea</option><option>Părinții soției</option><option>Cămin seniori</option></select><select><option>Maria Popescu · senioră</option><option>Ion Popescu · senior</option><option>Ana Popescu · copil</option><option>Casa din Iași · locuință</option><option>Rex · animal de companie</option><option>Mașina tatălui · vehicul</option></select></div>
+   </div>
+  </div>
+  <section class="card"><h2 class="section-title">Recomandare nouă</h2><p class="muted">Introduci recomandarea primită de la medic și, dacă este cazul, o transformi în task recurent.</p><div class="form-grid"><div class="field"><label>Medic</label><input value="Dr. Popescu"></div><div class="field"><label>Tip recomandare</label><select><option>Tratament</option><option>Control</option><option>Regim alimentar</option><option>Kinetoterapie</option></select></div><div class="field full"><label>Text recomandare</label><textarea>Măsurare tensiune zilnic la ora 09:00 și notarea valorii.</textarea></div></div><button class="btn primary">Adaugă recomandare</button></section><section class="section card"><h2 class="section-title">Task nou de tratament</h2><p class="muted">Tratamentul se definește ca task recurent, cu început, sfârșit, ora, interval și zile exacte.</p><button class="btn primary">Adaugă tratament</button></section><section class="section card"><h2 class="section-title">Regulă recurentă</h2><div class="form-grid"><div class="field"><label>Începe la</label><input type="date" value="2026-07-01"></div><div class="field"><label>Până la</label><input type="date" value="2026-12-31"></div><div class="field"><label>Ora</label><input type="time" value="09:00"></div><div class="field"><label>Se repetă</label><select><option>Zile selectate</option><option>Zilnic</option><option>Din X în X zile</option><option>Săptămânal</option><option>O singură dată</option></select></div><div class="field"><label>Interval la X zile</label><input type="number" value="2" min="1"></div><div class="field"><label>Escaladare după minute</label><input type="number" value="30" min="0"></div><div class="field full"><label>Zile active</label><div class="checkbox-row"><label class="check-pill"><input type="checkbox">Luni</label><label class="check-pill"><input type="checkbox">Marți</label><label class="check-pill"><input type="checkbox">Miercuri</label><label class="check-pill"><input type="checkbox">Joi</label><label class="check-pill"><input type="checkbox">Vineri</label><label class="check-pill"><input type="checkbox">Sâmbătă</label><label class="check-pill"><input type="checkbox">Duminică</label></div></div><div class="field full"><label>Email notificare</label><div class="checkbox-row"><label class="check-pill"><input type="checkbox">Trimite email la adăugare</label><label class="check-pill"><input type="checkbox">Trimite email la finalizare</label></div></div><div class="field full"><label>Destinatari email</label><input value="ioana@example.com; andrei@example.com"></div></div></section><section class="section card"><h2 class="section-title">Recomandări existente</h2><div class="table-wrap"><table><tr><th>Recomandare</th><th>Medic</th><th>Status</th><th>Task</th></tr><tr><td>Măsurare tensiune zilnic</td><td>Dr. Popescu</td><td>Activă</td><td>Generat</td></tr><tr><td>Control cardiologie</td><td>Dr. Ionescu</td><td>Programare necesară</td><td>Necreat</td></tr></table></div></section>
+ </main>
+</div>
+<script>
+(function(){
+ const KEY = 'familycare-theme';
+ const saved = localStorage.getItem(KEY) || 'light';
+ const apply = (theme) => {
+  document.documentElement.classList.toggle('dark-theme', theme === 'dark');
+  document.body.classList.toggle('dark-theme', theme === 'dark');
+  localStorage.setItem(KEY, theme);
+  document.querySelectorAll('[data-theme]').forEach(btn => {
+   btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+ };
+ apply(saved === 'dark' ? 'dark' : 'light');
+ document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => apply(btn.dataset.theme));
+ });
+})();
+</script>
+
+
+<script>
+(function(){
+ const key='familycare-menu-collapsed';
+ const shell=document.querySelector('.app-shell');
+ const btn=document.getElementById('menuToggle');
+ function apply(v){ if(shell) shell.classList.toggle('menu-collapsed', v==='1'); if(btn) btn.textContent=v==='1'?'☰':'☰'; }
+ apply(localStorage.getItem(key)||(window.innerWidth<=1000?'1':'0'));
+ if(btn) btn.addEventListener('click',()=>{ const next=shell&&shell.classList.contains('menu-collapsed')?'0':'1'; localStorage.setItem(key,next); apply(next); });
+})();
+</script>
+</body>
+</html>
