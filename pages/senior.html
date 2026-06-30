@@ -13,17 +13,10 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.66</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.67</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
-     <button id="logoutBtn" type="button">Ieșire</button>
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
-     <select id="soundType" class="sound-select" aria-label="Tip sunet">
-      <option value="soft">Sunet blând</option>
-      <option value="bell">Clopoțel</option>
-      <option value="alert">Alertă</option>
-     </select>
-     <label class="sound-volume" aria-label="Volum sunet"><span>Volum</span><input id="soundVolume" type="range" min="0" max="100" value="70"></label>
      <div class="kiosk-now" id="currentNow">Azi · --:--</div>
     </div>
   </header>
@@ -44,9 +37,9 @@
   </section>
 
   <section class="kiosk-actions">
-   <button type="button" class="kiosk-action call" data-action="call"><span>☎</span><b>Sună familia</b><small>Contact principal</small></button>
-   <button type="button" class="kiosk-action message" data-action="message"><span>✎</span><b>Trimite mesaj</b><small>Mesaj vocal sau text</small></button>
-   <button type="button" class="kiosk-action help" data-action="help"><span>!</span><b>Am nevoie de ajutor</b><small>Trimite alertă</small></button>
+   <button type="button" class="kiosk-action call" data-action="call"><span>☎</span><b>Sună familia</b></button>
+   <button type="button" class="kiosk-action message" data-action="message"><span>✎</span><b>Trimite mesaj</b></button>
+   <button type="button" class="kiosk-action help" data-action="help"><span>!</span><b>Am nevoie de ajutor</b></button>
   </section>
 
   <div id="contactActionModal" class="contact-action-modal" aria-hidden="true">
@@ -60,7 +53,7 @@
     </div>
     <div class="contact-action-body">
      <section class="contact-choice-panel">
-      <h3>Alege numărul</h3>
+      <p class="contact-instruction" id="contactInstruction">Selectează numărul pe care dorești să suni.</p>
       <div id="contactChoices" class="contact-choices"></div>
      </section>
      <section class="dial-panel" id="dialPanel">
@@ -114,6 +107,7 @@ function saveConfirmedKeys(){try{localStorage.setItem(CONFIRMED_KEY, JSON.string
 function loadSoundSettings(){try{return {...{type:'soft',volume:70},...JSON.parse(localStorage.getItem('familycare-sound-settings')||'{}')}}catch(e){return {type:'soft',volume:70}}}
 function saveSoundSettings(){try{localStorage.setItem('familycare-sound-settings',JSON.stringify(soundSettings));}catch(e){}}
 function initSoundControls(){const type=document.getElementById('soundType');const vol=document.getElementById('soundVolume');if(type){type.value=soundSettings.type||'soft';type.onchange=()=>{soundSettings.type=type.value;saveSoundSettings();playAlarmSound(true);};}if(vol){vol.value=String(soundSettings.volume??70);vol.oninput=()=>{soundSettings.volume=Number(vol.value)||0;saveSoundSettings();};vol.onchange=()=>playAlarmSound(true);}}
+async function loadRemoteSoundSettings(){try{const r=await apiFetch('/api/senior-sound-settings?ts='+Date.now()); if(!r.ok)return; const cfg=await r.json(); const type=String(cfg.type||cfg['Tip sunet']||soundSettings.type||'soft').toLowerCase(); const volume=Number(cfg.volume??cfg.Volum??soundSettings.volume??70); soundSettings.type=['soft','bell','alert'].includes(type)?type:'soft'; soundSettings.volume=Math.max(0,Math.min(100,isFinite(volume)?volume:70)); saveSoundSettings();}catch(e){}}
 
 function keyFromTarget(t,target){const d=target||t.target||new Date();return `${t.entity_code||''}|${t.id||t.title||''}|${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;}
 function isAlreadyConfirmed(t){const status=String(t.status||'').toLowerCase(); if(t.confirmed_at||status.includes('confirmat')||status.includes('confirmed'))return true; return confirmedKeys.has(t.occurrence_key||keyFromTarget(t,t.target));}
@@ -132,7 +126,7 @@ function renderSeniorCards(){const box=document.getElementById('seniorCards'); c
   if(document.activeElement) document.activeElement.blur();
   setTimeout(()=>focusConfirmZone(selectedEntityCode),40);
  });}
-function renderDayCards(){const today=jsWeekday(new Date()); document.getElementById('dayCards').innerHTML=[1,2,3,4,5,6,7].map(n=>{const d=dateForWeekday(n); return `<button type="button" class="kiosk-day ${n===selectedDay?'active':''}" data-day="${n}"><b>${dayName(n)}</b><span>${n===today?'astăzi · ':''}${pad(d.getDate())}.${pad(d.getMonth()+1)}</span></button>`;}).join(''); document.querySelectorAll('.kiosk-day').forEach(btn=>btn.onclick=()=>{selectedDay=Number(btn.dataset.day); renderDayCards(); renderTreatments();});}
+function renderDayCards(){const today=jsWeekday(new Date()); document.getElementById('dayCards').innerHTML=[1,2,3,4,5,6,7].map(n=>{const d=dateForWeekday(n); const isToday=n===today; return `<button type="button" class="kiosk-day ${n===selectedDay?'active':''}" data-day="${n}"><b>${dayName(n)}</b>${isToday?'<span class="day-today">astăzi</span>':''}<span class="day-date">${pad(d.getDate())}.${pad(d.getMonth()+1)}</span></button>`;}).join(''); document.querySelectorAll('.kiosk-day').forEach(btn=>btn.onclick=()=>{selectedDay=Number(btn.dataset.day); renderDayCards(); renderTreatments();});}
 function focusConfirmZone(entityCode){document.querySelectorAll('.confirm-zone').forEach(z=>z.classList.toggle('selected-senior', z.dataset.entity===entityCode)); const z=document.querySelector(`.confirm-zone[data-entity="${CSS.escape(entityCode||'')}"]`); if(z){z.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});}}
 function fallbackTreatments(){const now=new Date(); const t1=new Date(now.getTime()+7*60000); const t2=new Date(now.getTime()+26*60000); return [
  {id:'demo-maria',entity_code:'ME-0001',entity_name:'Maria Popescu',title:'Furazolidon',description:'1 comprimat',start_date:now.toISOString().slice(0,10),end_date:'2026-12-31',start_time:t1.toTimeString().slice(0,5),recurrence_rule:'daily',active_weekdays:'1,2,3,4,5,6,7'},
@@ -293,15 +287,19 @@ document.getElementById('confirmTreatment').onclick=confirmCurrentTreatment;
 let pendingContactAction='call';
 function contactList(){
  const fc=familyContact||{};
- const raw=Array.isArray(fc.Contacte)?fc.Contacte:[];
+ const raw=(Array.isArray(fc.Contacte)?fc.Contacte:[]).map((c,i)=>({...c, _source:'raw', _order:i}));
  const built=[
-  {Etichetă:'Principal', Nume:fc['Nume principal']||fc.Nume||'Contact principal', Telefon:fc['Telefon principal']||fc.Telefon},
+  {Etichetă:'Principal', Nume:fc['Nume principal']||fc.Nume||'Contact principal', Telefon:fc['Telefon principal']||fc.Telefon, Implicit:true},
   {Etichetă:'Secundar', Nume:fc['Nume secundar']||'Contact secundar', Telefon:fc['Telefon secundar']},
   {Etichetă:'Al treilea', Nume:fc['Nume al treilea']||'Contact rezervă', Telefon:fc['Telefon al treilea']||fc['Telefon urgență']}
  ];
  const merged=[...raw,...built].filter(c=>cleanPhone(c.Telefon));
  const seen=new Set();
- return merged.filter(c=>{const p=cleanPhone(c.Telefon); if(seen.has(p)) return false; seen.add(p); c.Telefon=p; return true;});
+ const list=merged.filter((c,i)=>{const p=cleanPhone(c.Telefon); if(seen.has(p)) return false; seen.add(p); c.Telefon=p; if(c.Implicit===undefined && c.implicit===undefined && c.Default===undefined && c.default===undefined) c.Implicit=i===0; return true;});
+ const implicitIndex=list.findIndex(c=>['da','true','1','yes','implicit'].includes(String(c.Implicit??c.implicit??c.Default??c.default??'').toLowerCase()));
+ if(implicitIndex>0){const [def]=list.splice(implicitIndex,1); list.unshift(def);}
+ if(list[0]) list[0].Implicit=true;
+ return list;
 }
 function actionLabel(action){return action==='call'?'Sună familia':(action==='message'?'Trimite mesaj':'Am nevoie de ajutor');}
 function defaultBody(action){return action==='help'?(familyContact['Mesaj ajutor']||familyContact['Mesaj implicit']||'Am nevoie de ajutor. Te rog să mă contactezi.'):(familyContact['Mesaj SMS']||'Te rog să mă contactezi.');}
@@ -330,7 +328,9 @@ function openContactAction(action){
  document.getElementById('contactActionTitle').textContent=actionLabel(action);
  document.getElementById('contactActionKicker').textContent=action==='call'?'Alege contactul pentru apel':(action==='message'?'Scrie mesajul':'Scrie alerta');
  document.getElementById('contactActionMain').textContent=action==='call'?'Apelează':(action==='message'?'Trimite mesaj':'Trimite alertă');
- choices.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="contact-choice ${i===0?'active':''}" data-phone="${safe(c.Telefon)}"><b>${list.length===1?'Număr apelare':safe(c.Etichetă||('Contact '+(i+1)))}</b><span>${safe(c.Nume||'Contact')}</span><strong>${safe(c.Telefon)}</strong></button>`).join(''):'<div class="contact-missing">Nu există numere configurate.</div>';
+ const instruction=document.getElementById('contactInstruction');
+ if(instruction) instruction.textContent=action==='call'?'Selectează numărul pe care dorești să suni.':'Alege contactul și scrie mesajul.';
+ choices.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="contact-choice ${i===0?'active':''}" data-phone="${safe(c.Telefon)}"><span class="choice-radio" aria-hidden="true"></span><span class="choice-main"><b>${safe(c.Etichetă||('Contact '+(i+1)))}</b><strong>${safe(c.Telefon)}</strong></span>${i===0?'<em>Implicit</em>':''}</button>`).join(''):'<div class="contact-missing">Nu există numere configurate.</div>';
  const first=list[0]&&list[0].Telefon||'';
  if(dialInput) dialInput.value=first;
  choices.querySelectorAll('.contact-choice').forEach(btn=>btn.onclick=()=>{choices.querySelectorAll('.contact-choice').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); if(dialInput) dialInput.value=btn.dataset.phone||'';});
@@ -355,9 +355,10 @@ const closeContactBtn=document.getElementById('contactActionClose'); if(closeCon
 const runContactBtn=document.getElementById('contactActionMain'); if(runContactBtn) runContactBtn.onclick=runContactAction;
 const contactModal=document.getElementById('contactActionModal'); if(contactModal) contactModal.addEventListener('click',e=>{if(e.target===contactModal)closeContactAction();});
 
-document.getElementById('themeBtn').onclick=()=>{const isDark=document.documentElement.classList.toggle('dark-theme'); document.body.classList.toggle('dark-theme',isDark); localStorage.setItem('familycare-theme',isDark?'dark':'light'); document.getElementById('themeBtn').textContent=isDark?'Light':'Dark';};
+const themeBtn=document.getElementById('themeBtn');
+if(themeBtn) themeBtn.textContent=document.documentElement.classList.contains('dark-theme')?'Light':'Dark';
+if(themeBtn) themeBtn.onclick=()=>{const isDark=document.documentElement.classList.toggle('dark-theme'); document.body.classList.toggle('dark-theme',isDark); localStorage.setItem('familycare-theme',isDark?'dark':'light'); themeBtn.textContent=isDark?'Light':'Dark';};
 document.getElementById('languageBtn').onclick=()=>toast('Limba RO este activă.');
-document.getElementById('logoutBtn').onclick=()=>{localStorage.removeItem(SESSION_KEY);location.href='senior-login.html';};
 
 function setTreatmentsCollapsed(value){
  treatmentsCollapsed=!!value;
@@ -370,7 +371,7 @@ function setTreatmentsCollapsed(value){
 }
 const collapseBtn=document.getElementById('collapseTreatments');
 if(collapseBtn) collapseBtn.onclick=()=>setTreatmentsCollapsed(!treatmentsCollapsed);
-initSoundControls(); if(initSession()){renderDayCards(); loadFamilyContact(); loadEntities().then(loadTreatments); setInterval(loadTreatments,60000); setInterval(()=>{updateClock(); renderTreatments();},30000);}
+initSoundControls(); if(initSession()){loadRemoteSoundSettings(); renderDayCards(); loadFamilyContact(); loadEntities().then(loadTreatments); setInterval(loadTreatments,60000); setInterval(()=>{updateClock(); renderTreatments();},30000);}
 
 </script>
 </body>

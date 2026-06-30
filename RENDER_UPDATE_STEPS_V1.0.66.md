@@ -1,11 +1,11 @@
-# FamilyCare Senior V1.0.66 Render Update
+# FamilyCare Senior V1.0.67 Render Update
 
 ## Ce s-a modificat
 - Eliminată tastatura numerică custom din modalul de apel.
 - Eliminată tastatura text custom și mesajele rapide din modalul de SMS/alertă.
 - Se folosește tastatura nativă a telefonului doar când utilizatorul apasă în câmp.
 - Dacă există un singur număr configurat, se afișează doar acel număr, clar, ca singură alegere.
-- Cache PWA actualizat la V1.0.66.
+- Cache PWA actualizat la V1.0.67.
 
 ## Pași
 1. Urcă tot conținutul arhivei în repo-ul `familycare-senior`, direct în root.

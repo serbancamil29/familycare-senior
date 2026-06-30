@@ -215,6 +215,29 @@ async function handleSeniorLoginApi(req,res,url){
   if(req.method!=='POST'){send(res,405,'Method not allowed');return true}
   try{const b=await readJson(req);if(!sameSecret(b.pin||'',SENIOR_PIN)){send(res,401,JSON.stringify({ok:false,error:'PIN incorect'}),'application/json; charset=utf-8');return true}const token=crypto.randomBytes(32).toString('base64url');seniorSessions.set(token,Date.now()+SESSION_TTL_MS);send(res,200,JSON.stringify({ok:true,token,expiresIn:SESSION_TTL_MS}),'application/json; charset=utf-8');return true}catch(e){send(res,400,e.message||'Cerere invalidă');return true}
 }
+async function handleSeniorSoundSettingsApi(req, res, url) {
+  if (url.pathname !== '/api/senior-sound-settings') return false;
+  try {
+    if (req.method !== 'GET') { send(res, 405, 'Method not allowed'); return true; }
+    const sql = `select coalesce((
+      select jsonb_build_object(
+        'type', case when lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) in ('soft','bell','alert') then lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) else 'soft' end,
+        'volume', case when coalesce(payload->>'Volum', payload->>'volume', '') ~ '^[0-9]+$' then least(100, greatest(0, coalesce(payload->>'Volum', payload->>'volume')::int)) else 70 end,
+        'active', coalesce(payload->>'Activ', payload->>'active', 'da')
+      )::text
+      from ${dq(PGSCHEMA)}.config_record
+      where section_key='senior-sound-settings'
+      order by sort_order, id
+      limit 1
+    ), jsonb_build_object('type','soft','volume',70,'active','da')::text);`;
+    send(res, 200, await runPsql(sql) || '{"type":"soft","volume":70,"active":"da"}', 'application/json; charset=utf-8');
+    return true;
+  } catch(e) {
+    send(res, 200, JSON.stringify({type:'soft',volume:70,active:'da'}), 'application/json; charset=utf-8');
+    return true;
+  }
+}
+
 async function handleFamilyContactApi(req,res,url) {
   if (url.pathname !== '/api/family-contact') return false;
   try {
@@ -368,6 +391,7 @@ const requestHandler=async(req,res)=>{res.familyCareFrameAncestors=frameAncestor
   if(url.pathname.startsWith('/api/')&&!['GET','HEAD','OPTIONS'].includes(req.method)&&!originAllowed(req)){send(res,403,'Origin not allowed');return}
   if(await handleSeniorLoginApi(req,res,url))return;
   if(url.pathname.startsWith('/api/')&&!authorizedSenior(req)){send(res,401,JSON.stringify({ok:false,error:'Sesiune expirată'}),'application/json; charset=utf-8');return}
+  if(await handleSeniorSoundSettingsApi(req,res,url)) return;
   if(await handleFamilyContactApi(req,res,url)) return;
   if(await handleTreatmentConfirmApi(req,res,url)) return; if(await handleQuickActionApi(req,res,url)) return; if(await handleApi(req,res,url)) return;
   let pathname=decodeURIComponent(url.pathname); if(pathname==='/') pathname='/pages/senior-login.html'; const file=path.resolve(ROOT,pathname.replace(/^[/\\]+/,'')); const relative=path.relative(ROOT,file); if(relative.startsWith('..')||path.isAbsolute(relative)){send(res,403,'Forbidden'); return} fs.readFile(file,(err,data)=>{if(err){send(res,404,'Not found');return} send(res,200,data,MIME[path.extname(file).toLowerCase()]||'application/octet-stream')})
@@ -376,4 +400,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.64 Universal PWA is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+'/pages/senior-login.html');console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.67 Universal PWA is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+'/pages/senior-login.html');console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});

@@ -625,6 +625,7 @@ values
 ('alert-rules', jsonb_build_object('Denumire','Tratament intarziat','Conditie','neconfirmat dupa 30 minute','Escaladare','familie'), 1),
 ('notification-channels', jsonb_build_object('Canal','Email','Tip','outbound','Activ','da','Detalii','notificari la taskuri'), 1),
 ('notification-channels', jsonb_build_object('Canal','Telefon','Tip','apel/SMS','Activ','viitor','Detalii','pentru seniori fara tableta'), 2),
+('senior-sound-settings', jsonb_build_object('Tip sunet','soft','Volum','70','Activ','da'), 1),
 ('subscription-plans', jsonb_build_object('Plan','Basic','Pret','5 EUR','Limita persoane','1','Detalii','calendar + jurnal'), 1),
 ('subscription-plans', jsonb_build_object('Plan','Family Plus','Pret','10 EUR','Limita persoane','3','Detalii','alerte + email + istoric'), 2),
 ('info', jsonb_build_object('Cheie','Produs','Valoare','FamilyCare','Categorie','aplicatie','Detalii','Agenda inteligenta de familie pentru persoane si alte entitati.'), 1);
@@ -971,6 +972,13 @@ values
     'Activ','demo',
     'Detalii','Preluare emailuri de la medic, farmacie, îngrijitor sau furnizor.'
 ), 3),
+
+-- Sunet ecran Senior
+('senior-sound-settings', jsonb_build_object(
+    'Tip sunet','soft',
+    'Volum','70',
+    'Activ','da'
+), 1),
 
 -- Planuri abonament
 ('subscription-plans', jsonb_build_object(
