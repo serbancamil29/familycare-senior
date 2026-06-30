@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.69</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.70</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -96,7 +96,7 @@
 const SESSION_KEY='familycare-senior-session';
 let session={headerCode:'CH-RO-0001', branchCode:'CB-0001', branchName:'Părinții mei'};
 const nativeFetch=window.fetch.bind(window);
-async function apiFetch(url,options={}){const headers=new Headers(options.headers||{});if(session.token)headers.set('Authorization','Bearer '+session.token);const response=await nativeFetch(url,{...options,headers});if(response.status===401){localStorage.removeItem(SESSION_KEY);window.location.replace('senior-login.html');throw new Error('Sesiune expirată');}return response;}
+async function apiFetch(url,options={}){const headers=new Headers(options.headers||{});if(session.token)headers.set('Authorization','Bearer '+session.token);const response=await nativeFetch(url,{...options,headers});if(response.status===401){throw new Error('Sesiune expirată');}return response;}
 let allEntities=[], allTreatments=[], selectedEntityCode='', selectedDay=jsWeekday(new Date()), currentTreatment=null;
 let familyContact={Nume:'Contact familie',Telefon:'0700000000',Email:'contact@example.com','Mesaj implicit':'Am nevoie de ajutor. Te rog să mă contactezi.'};
 const CONFIRMED_KEY='familycare-senior-confirmed-occurrences';
@@ -136,7 +136,7 @@ function isAlreadyConfirmed(t){const status=String(t.status||'').toLowerCase();i
 function severityClass(diff){if(diff<=0)return 'state-overdue'; if(diff<=5)return 'state-05'; if(diff<=10)return 'state-10'; if(diff<=20)return 'state-20'; if(diff<=30)return 'state-30'; return 'state-calm';}
 function clearSeverity(el){if(!el)return; el.classList.remove('state-calm','state-30','state-20','state-10','state-05','state-overdue','soon','urgent','alarm');}
 function updateClock(){const d=new Date(); const el=document.getElementById('currentNow'); if(el) el.textContent=`${dayName(jsWeekday(d))}, ${d.toLocaleDateString('ro-RO')} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
-function initSession(){try{session={...session,...JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')}}catch(e){} if(Number(session.expiresAt||0)<Date.now()){localStorage.removeItem(SESSION_KEY);window.location.replace('senior-login.html');return false} updateClock(); setInterval(updateClock,30000);return true;}
+function initSession(){try{session={...session,...JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')}}catch(e){} if(Number(session.expiresAt||0)<Date.now()){session={...session,headerCode:'CH-RO-0001',branchCode:session.branchCode||'CB-0001',branchName:session.branchName||'Părinții mei',expiresAt:Date.now()+365*24*60*60*1000,ts:Date.now()};try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch(e){}} updateClock(); setInterval(updateClock,30000);return true;}
 function selectedEntityName(){const e=allEntities.find(x=>x.entity_code===selectedEntityCode);return e?e.name:'';}
 function mergeEntities(db){const byCode=new Map(); [...FALLBACK_ENTITIES, ...(Array.isArray(db)?db:[])].forEach(e=>{if(e&&e.entity_code&&isSenior(e)&&branchMatches(e)&&(!session.singleEntity||!session.entityCode||e.entity_code===session.entityCode)) byCode.set(e.entity_code, {...(byCode.get(e.entity_code)||{}), ...e});}); return [...byCode.values()];}
 async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?branchCode='+encodeURIComponent(session.branchCode)+'&ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); if(!allEntities.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}

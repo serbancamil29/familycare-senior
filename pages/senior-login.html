@@ -12,7 +12,7 @@
 <body class="senior-login-body">
  <main class="login-screen">
   <section class="login-card">
-   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>by Cademix · v1.0.69</span></div></div>
+   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>by Cademix · v1.0.70</span></div></div>
    <h1>Acces ramură</h1>
    <form id="seniorLoginForm" class="login-form">
     <label>Ramură<select id="branchCode"><option value="CB-0001">Părinții mei</option><option value="CB-0002">Familia mea</option><option value="CB-0003">Părinții soției</option><option value="CB-0006">Cămin seniori</option></select></label>
@@ -36,7 +36,7 @@
   }catch(_){}
  }
  loadBranches();
- fetch('/api/senior/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(s.authenticated)location.replace('senior.html')}).catch(()=>{});
+ fetch('/api/senior/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(s.authenticated || s.authRequired===false)location.replace('senior.html')}).catch(()=>{});
  document.getElementById('seniorLoginForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
   const error=document.getElementById('loginError');

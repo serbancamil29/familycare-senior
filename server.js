@@ -182,11 +182,14 @@ const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
 const SENIOR_PIN = String(process.env.SENIOR_PIN || '');
 const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
+// V1.0.70: test mode requested by Camil. By default, Senior can be opened directly without PIN.
+// To re-enable PIN later, set FAMILYCARE_AUTH_DISABLED=false (or SENIOR_AUTH_DISABLED=false) and configure SENIOR_PIN with 6-12 digits.
+const SENIOR_AUTH_DISABLED = !['false','0','no','nu'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || 'true').trim().toLowerCase());
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const seniorSessions = new Map();
 const loginAttempts = new Map();
-if (!/^\d{6,12}$/.test(SENIOR_PIN)) {
-  console.error('ERROR: SENIOR_PIN trebuie configurat cu 6-12 cifre. PIN-ul gol sau prea scurt nu este permis.');
+if (!SENIOR_AUTH_DISABLED && !/^\d{6,12}$/.test(SENIOR_PIN)) {
+  console.error('ERROR: SENIOR_PIN trebuie configurat cu 6-12 cifre când autentificarea este activă.');
   process.exit(1);
 }
 const MIME = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml; charset=utf-8','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8','.txt':'text/plain; charset=utf-8'};
@@ -233,7 +236,7 @@ function originAllowed(req){const origin=req.headers.origin;if(!origin)return tr
 function requestIsSecure(req){return HTTPS_ENABLED||String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase()==='https'}
 function cookies(req){return String(req.headers.cookie||'').split(';').reduce((out,part)=>{const index=part.indexOf('=');if(index>0)out[part.slice(0,index).trim()]=decodeURIComponent(part.slice(index+1).trim());return out},{})}
 function seniorCookie(token,req,maxAge){return `fc_senior_session=${encodeURIComponent(token||'')}; Path=/; HttpOnly; SameSite=Strict${requestIsSecure(req)?'; Secure':''}; Max-Age=${Math.max(0,maxAge||0)}`}
-function authorizedSenior(req){const bearer=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');const token=cookies(req).fc_senior_session||bearer;const expires=seniorSessions.get(token);if(!expires||expires<Date.now()){if(token)seniorSessions.delete(token);return false}seniorSessions.set(token,Date.now()+SESSION_TTL_MS);return true}
+function authorizedSenior(req){if(SENIOR_AUTH_DISABLED)return true;const bearer=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');const token=cookies(req).fc_senior_session||bearer;const expires=seniorSessions.get(token);if(!expires||expires<Date.now()){if(token)seniorSessions.delete(token);return false}seniorSessions.set(token,Date.now()+SESSION_TTL_MS);return true}
 function loginKey(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim()}
 function loginBlocked(req){const state=loginAttempts.get(loginKey(req));if(!state)return false;if(state.until>Date.now())return true;if(state.until)loginAttempts.delete(loginKey(req));return false}
 function loginFailure(req){const key=loginKey(req);const state=loginAttempts.get(key)||{count:0,first:Date.now(),until:0};if(Date.now()-state.first>15*60*1000){state.count=0;state.first=Date.now()}state.count+=1;if(state.count>=5)state.until=Date.now()+15*60*1000;loginAttempts.set(key,state)}
@@ -246,10 +249,11 @@ async function handleSeniorLoginApi(req,res,url){
     }catch(_){send(res,200,JSON.stringify([{branch_code:'CB-0001',name:'Părinții mei'}]),'application/json; charset=utf-8');}
     return true;
   }
-  if(url.pathname==='/api/senior/session'&&req.method==='GET'){send(res,200,JSON.stringify({ok:true,authenticated:authorizedSenior(req),singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE,expiresIn:SESSION_TTL_MS}),'application/json; charset=utf-8');return true}
+  if(url.pathname==='/api/senior/session'&&req.method==='GET'){send(res,200,JSON.stringify({ok:true,authenticated:authorizedSenior(req),authRequired:!SENIOR_AUTH_DISABLED,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE,expiresIn:SESSION_TTL_MS}),'application/json; charset=utf-8');return true}
   if(url.pathname==='/api/senior/logout'&&req.method==='DELETE'){const token=cookies(req).fc_senior_session||'';if(token)seniorSessions.delete(token);res.setHeader('Set-Cookie',seniorCookie('',req,0));send(res,200,'{"ok":true}','application/json; charset=utf-8');return true}
   if(url.pathname!=='/api/senior/login')return false;
   if(req.method!=='POST'){send(res,405,'Method not allowed');return true}
+  if(SENIOR_AUTH_DISABLED){send(res,200,JSON.stringify({ok:true,authRequired:false,expiresIn:SESSION_TTL_MS,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE}),'application/json; charset=utf-8');return true}
   if(loginBlocked(req)){send(res,429,JSON.stringify({ok:false,error:'Prea multe încercări. Reîncearcă peste 15 minute.'}),'application/json; charset=utf-8');return true}
   try{const b=await readJson(req);if(!sameSecret(b.pin||'',SENIOR_PIN)){loginFailure(req);send(res,401,JSON.stringify({ok:false,error:'PIN incorect'}),'application/json; charset=utf-8');return true}loginAttempts.delete(loginKey(req));const token=crypto.randomBytes(32).toString('base64url');seniorSessions.set(token,Date.now()+SESSION_TTL_MS);res.setHeader('Set-Cookie',seniorCookie(token,req,Math.floor(SESSION_TTL_MS/1000)));send(res,200,JSON.stringify({ok:true,expiresIn:SESSION_TTL_MS,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE}),'application/json; charset=utf-8');return true}catch(e){send(res,400,e.message||'Cerere invalidă');return true}
 }
@@ -476,10 +480,10 @@ const requestHandler=async(req,res)=>{res.familyCareFrameAncestors=frameAncestor
   if(await handleSeniorSoundSettingsApi(req,res,url)) return;
   if(await handleFamilyContactApi(req,res,url)) return;
   if(await handleTreatmentConfirmApi(req,res,url)) return; if(await handleTreatmentDecisionApi(req,res,url)) return; if(await handleBeneficiaryFeedbackApi(req,res,url)) return; if(await handleQuickActionApi(req,res,url)) return; if(await handleApi(req,res,url)) return;
-  let pathname=decodeURIComponent(url.pathname); if(pathname==='/') pathname='/pages/senior-login.html'; if (/\.(md|sql|txt|log|env|ya?ml)$/i.test(pathname) || pathname.includes('/tests/')) { send(res,404,'Not found'); return; } const file=path.resolve(ROOT,pathname.replace(/^[/\\]+/,'')); const relative=path.relative(ROOT,file); if(relative.startsWith('..')||path.isAbsolute(relative)){send(res,403,'Forbidden'); return} fs.readFile(file,(err,data)=>{if(err){send(res,404,'Not found');return} send(res,200,data,MIME[path.extname(file).toLowerCase()]||'application/octet-stream')})
+  let pathname=decodeURIComponent(url.pathname); if(pathname==='/') pathname=SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'; if (/\.(md|sql|txt|log|env|ya?ml)$/i.test(pathname) || pathname.includes('/tests/')) { send(res,404,'Not found'); return; } const file=path.resolve(ROOT,pathname.replace(/^[/\\]+/,'')); const relative=path.relative(ROOT,file); if(relative.startsWith('..')||path.isAbsolute(relative)){send(res,403,'Forbidden'); return} fs.readFile(file,(err,data)=>{if(err){send(res,404,'Not found');return} send(res,200,data,MIME[path.extname(file).toLowerCase()]||'application/octet-stream')})
 };
 let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.69 Rights & Safety UI is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+'/pages/senior-login.html');console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.70 Test No Auth Layout Fix is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
