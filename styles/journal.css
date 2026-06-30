@@ -1,2 +1,0 @@
-/* Page-specific stylesheet. Shared visual system is in common.css. */
-.note{border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--surface);margin-bottom:12px}.tag{display:inline-block;background:var(--primary-soft);color:var(--primary-strong);border-radius:999px;padding:5px 9px;margin-right:6px;font-size:12px;font-weight:900}
