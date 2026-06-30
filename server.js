@@ -1,4 +1,5 @@
 'use strict';
+
 const http = require('http');
 const https = require('https');
 const fs = require('fs');
@@ -27,6 +28,30 @@ function isActiveMailValue(v) {
   const x = String(v ?? '').trim().toLowerCase();
   return !['nu','no','false','0','inactiv','inactive','off'].includes(x);
 }
+function mailSecretKey() {
+  const secret = String(process.env.MAIL_SECRET_KEY || '');
+  return secret ? crypto.createHash('sha256').update(secret, 'utf8').digest() : null;
+}
+function encryptMailSecret(value) {
+  const key = mailSecretKey();
+  if (!key) throw new Error('MAIL_SECRET_KEY trebuie configurată pentru salvarea securizată a parolei SMTP.');
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(String(value), 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ['enc','v1',iv.toString('base64url'),tag.toString('base64url'),encrypted.toString('base64url')].join(':');
+}
+function decryptMailSecret(value) {
+  const raw = String(value || '');
+  if (!raw.startsWith('enc:v1:')) return raw;
+  const key = mailSecretKey();
+  if (!key) throw new Error('MAIL_SECRET_KEY lipsește; parola SMTP salvată nu poate fi decriptată.');
+  const parts = raw.split(':');
+  if (parts.length !== 5) throw new Error('Secret SMTP invalid.');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(parts[2], 'base64url'));
+  decipher.setAuthTag(Buffer.from(parts[3], 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(parts[4], 'base64url')), decipher.final()]).toString('utf8');
+}
 async function mailCfg() {
   let dbCfg = null;
   try {
@@ -41,7 +66,8 @@ async function mailCfg() {
   } catch (_) { dbCfg = null; }
 
   const uiEmail = dbCfg && (dbCfg.Email || dbCfg['Email expeditor'] || dbCfg.Username || dbCfg.User || dbCfg['Adresă email']);
-  const uiPass = dbCfg && (dbCfg['Parolă'] || dbCfg.Parola || dbCfg.Password || dbCfg['Parolă aplicație'] || dbCfg['App password']);
+  const storedSecret = dbCfg && (dbCfg['Secret SMTP'] || dbCfg['Parolă'] || dbCfg.Parola || dbCfg.Password || dbCfg['Parolă aplicație'] || dbCfg['App password']);
+  const uiPass = storedSecret ? decryptMailSecret(storedSecret) : '';
   if (uiEmail && uiPass) {
     const inferred = inferSmtp(uiEmail);
     const active = isActiveMailValue(dbCfg.Activ ?? dbCfg.Active ?? 'da');
@@ -155,7 +181,7 @@ async function sendMailSMTP({to, subject, text}) {
 async function logEmailStatus(kind, recipients, subject, message, status, detail) {
   try {
     const payload = JSON.stringify({ Tip:kind, Către:recipients, Subiect:subject, Mesaj:message, Status:status, Detalii:detail || '', Data:new Date().toISOString() });
-    await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('email-outbox', ${dollar(payload)}::jsonb, 10);`);
+    await runPsql(`insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('email-outbox', ${dollar(payload)}::jsonb, 10);`);
   } catch(_) {}
 }
 async function sendAndLog(kind, recipients, subject, message) {
@@ -171,7 +197,7 @@ async function sendAndLog(kind, recipients, subject, message) {
 }
 
 
-const PORT = Number(process.env.PORT || 31001);
+const PORT = Number(process.env.PORT || 31000);
 const HOST = process.env.HOST || ((process.env.RENDER || process.env.NODE_ENV === 'production') ? '0.0.0.0' : '127.0.0.1');
 const ROOT = __dirname;
 const PGSCHEMA = process.env.PGSCHEMA || 'familycare';
@@ -180,156 +206,531 @@ const HTTPS_ENABLED = String(process.env.HTTPS || '').toLowerCase() === 'true';
 const TLS_PFX_PATH = process.env.TLS_PFX_PATH || path.join(ROOT, 'certs', 'familycare-local.pfx');
 const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
-const SENIOR_PIN = String(process.env.SENIOR_PIN || '');
-const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
-// V1.0.70: test mode requested by Camil. By default, Senior can be opened directly without PIN.
-// To re-enable PIN later, set FAMILYCARE_AUTH_DISABLED=false (or SENIOR_AUTH_DISABLED=false) and configure SENIOR_PIN with 6-12 digits.
-const SENIOR_AUTH_DISABLED = !['false','0','no','nu'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || 'true').trim().toLowerCase());
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const seniorSessions = new Map();
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
+const ADMIN_NAME = String(process.env.ADMIN_NAME || 'Administrator FamilyCare');
+// V1.0.70: test mode requested by Camil. By default, Render can start and Main can be opened without admin password.
+// To re-enable password protection later, set FAMILYCARE_AUTH_DISABLED=false (or MAIN_AUTH_DISABLED=false) and configure ADMIN_PASSWORD >= 12 chars.
+const MAIN_AUTH_DISABLED = !['false','0','no','nu'].includes(String(process.env.MAIN_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || 'true').trim().toLowerCase());
+const AUTH_REQUIRED = !MAIN_AUTH_DISABLED && (Boolean(ADMIN_PASSWORD) || process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER) || !['127.0.0.1','localhost','::1'].includes(HOST));
+const SESSION_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.SESSION_TTL_MINUTES || 480) * 60 * 1000);
+const adminSessions = new Map();
 const loginAttempts = new Map();
-if (!SENIOR_AUTH_DISABLED && !/^\d{6,12}$/.test(SENIOR_PIN)) {
-  console.error('ERROR: SENIOR_PIN trebuie configurat cu 6-12 cifre când autentificarea este activă.');
+
+if (AUTH_REQUIRED && ADMIN_PASSWORD.length < 12) {
+  console.error('ERROR: ADMIN_PASSWORD trebuie configurată și trebuie să aibă minimum 12 caractere pentru acces din rețea sau producție.');
   process.exit(1);
 }
-const MIME = {'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'application/javascript; charset=utf-8','.svg':'image/svg+xml; charset=utf-8','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8','.json':'application/json; charset=utf-8','.txt':'text/plain; charset=utf-8'};
-const MAIN_PORT = Number(process.env.MAIN_PORT || 31000);
-const MAIN_BASE_URL = String(process.env.MAIN_BASE_URL || '').replace(/\/$/, '');
-function safeOrigin(value){try{return new URL(value).origin}catch(_){return ''}}
-function frameAncestorsFor(req){
-  const configured=safeOrigin(MAIN_BASE_URL);
-  let local="'self'";
-  try{
-    const hostname=new URL(PROTOCOL+'://'+String(req.headers.host||'localhost')).hostname;
-    if(/^[a-z0-9.:-]+$/i.test(hostname)){const host=hostname.includes(':')?'['+hostname+']':hostname;local+=" http://"+host+":"+MAIN_PORT+" https://"+host+":"+MAIN_PORT}
-  }catch(_){}
-  return local+(configured?' '+configured:'');
-}
-function send(res,status,body,type='text/plain; charset=utf-8'){res.writeHead(status,{
-  'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff',
-  'Cross-Origin-Opener-Policy':'same-origin','X-Permitted-Cross-Domain-Policies':'none',
-  'Referrer-Policy':'no-referrer','Permissions-Policy':'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors "+(res.familyCareFrameAncestors||"'self'")+"; base-uri 'self'; form-action 'self'",
-  ...(res.familyCareSecureRequest ? {'Strict-Transport-Security':'max-age=31536000; includeSubDomains'} : {})
-});res.end(body)}
-function dq(s){return '"'+String(s).replace(/"/g,'""')+'"'}
-function dollar(text){let tag='fc';while(String(text).includes('$'+tag+'$')) tag+='x';return '$'+tag+'$'+String(text)+'$'+tag+'$'}
-let pgPool=null;
-function getPgPool(){
- if(!process.env.DATABASE_URL)return null;
- if(!pgPool){
-  const {Pool}=require('pg');
-  const sslMode=String(process.env.PGSSLMODE||'').toLowerCase();
-  const sslDisabled=['disable','disabled','false','0','no'].includes(sslMode)||String(process.env.DATABASE_SSL||'').toLowerCase()==='false';
-  const sslRequired=['require','true','1','yes'].includes(sslMode)||String(process.env.DATABASE_SSL||'').toLowerCase()==='true'||!!process.env.RENDER;
-  pgPool=new Pool({connectionString:process.env.DATABASE_URL,ssl:sslDisabled?false:(sslRequired?{rejectUnauthorized:false}:undefined),max:Number(process.env.PGPOOL_MAX||5),idleTimeoutMillis:30000,connectionTimeoutMillis:15000});
- }
- return pgPool;
-}
-function pgValue(value){if(value===null||value===undefined)return'';if(value instanceof Date)return value.toISOString();if(Buffer.isBuffer(value))return value.toString('utf8');if(typeof value==='object')return JSON.stringify(value);return String(value)}
-function pgOutput(result){const results=Array.isArray(result)?result:[result];const last=[...results].reverse().find(r=>r&&Array.isArray(r.rows));if(!last||!last.rows.length)return'';return last.rows.map(row=>{const values=Object.values(row);return values.length===1?pgValue(values[0]):values.map(pgValue).join('|')}).join('\n').trim()}
-function runPsql(sql){const pool=getPgPool();if(pool)return pool.query(sql).then(pgOutput).catch(error=>{throw new Error(error?.message||'PostgreSQL query failed')});return new Promise((resolve,reject)=>{const file=path.join(os.tmpdir(),'familycare_senior_'+Date.now()+'_'+Math.random().toString(16).slice(2)+'.sql');fs.writeFileSync(file,sql,'utf8');const args=['-X','-q','-t','-A','-v','ON_ERROR_STOP=1','-f',file];execFile(PSQL_BIN,args,{env:{...process.env},windowsHide:true,timeout:15000},(err,stdout,stderr)=>{try{fs.unlinkSync(file)}catch(_){} if(err){reject(new Error(String(stderr||err.message||'PostgreSQL command failed').trim()));return} resolve(String(stdout||'').trim())})})}
 
-async function readJson(req){return new Promise((resolve,reject)=>{let data='';req.on('data',c=>{data+=c;if(data.length>2000000)reject(new Error('Body too large'))});req.on('end',()=>{try{resolve(data?JSON.parse(data):{})}catch(e){reject(new Error('Invalid JSON body'))}});req.on('error',reject)})}
-function sameSecret(a,b){const aa=Buffer.from(String(a));const bb=Buffer.from(String(b));return aa.length===bb.length&&crypto.timingSafeEqual(aa,bb)}
-function originAllowed(req){const origin=req.headers.origin;if(!origin)return true;try{const u=new URL(origin);const forwardedProto=String(req.headers['x-forwarded-proto']||PROTOCOL).split(',')[0].trim();return u.protocol===forwardedProto+':'&&u.host.toLowerCase()===String(req.headers.host||'').toLowerCase()}catch(_){return false}}
-function requestIsSecure(req){return HTTPS_ENABLED||String(req.headers['x-forwarded-proto']||'').split(',')[0].trim().toLowerCase()==='https'}
-function cookies(req){return String(req.headers.cookie||'').split(';').reduce((out,part)=>{const index=part.indexOf('=');if(index>0)out[part.slice(0,index).trim()]=decodeURIComponent(part.slice(index+1).trim());return out},{})}
-function seniorCookie(token,req,maxAge){return `fc_senior_session=${encodeURIComponent(token||'')}; Path=/; HttpOnly; SameSite=Strict${requestIsSecure(req)?'; Secure':''}; Max-Age=${Math.max(0,maxAge||0)}`}
-function authorizedSenior(req){if(SENIOR_AUTH_DISABLED)return true;const bearer=String(req.headers.authorization||'').replace(/^Bearer\s+/i,'');const token=cookies(req).fc_senior_session||bearer;const expires=seniorSessions.get(token);if(!expires||expires<Date.now()){if(token)seniorSessions.delete(token);return false}seniorSessions.set(token,Date.now()+SESSION_TTL_MS);return true}
-function loginKey(req){return String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'unknown').split(',')[0].trim()}
-function loginBlocked(req){const state=loginAttempts.get(loginKey(req));if(!state)return false;if(state.until>Date.now())return true;if(state.until)loginAttempts.delete(loginKey(req));return false}
-function loginFailure(req){const key=loginKey(req);const state=loginAttempts.get(key)||{count:0,first:Date.now(),until:0};if(Date.now()-state.first>15*60*1000){state.count=0;state.first=Date.now()}state.count+=1;if(state.count>=5)state.until=Date.now()+15*60*1000;loginAttempts.set(key,state)}
-async function handleSeniorLoginApi(req,res,url){
-  if(url.pathname==='/api/senior/branches'&&req.method==='GET'){
-    try{
-      const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (select branch_code, name from ${dq(PGSCHEMA)}.care_branch where coalesce(active,true)=true order by sort_order,id) t;`;
-      const out=await runPsql(sql);
-      send(res,200,out&&out!=='[]'?out:JSON.stringify([{branch_code:'CB-0001',name:'Părinții mei'}]),'application/json; charset=utf-8');
-    }catch(_){send(res,200,JSON.stringify([{branch_code:'CB-0001',name:'Părinții mei'}]),'application/json; charset=utf-8');}
+function sameSecret(a, b) {
+  const aa = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+}
+function requestIsSecure(req) {
+  return HTTPS_ENABLED || String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase() === 'https';
+}
+function parseCookies(req) {
+  return String(req.headers.cookie || '').split(';').reduce((out, part) => {
+    const index = part.indexOf('=');
+    if (index > 0) out[part.slice(0,index).trim()] = decodeURIComponent(part.slice(index + 1).trim());
+    return out;
+  }, {});
+}
+function sessionCookie(token, req, maxAgeSeconds) {
+  const secure = requestIsSecure(req) ? '; Secure' : '';
+  return `fc_main_session=${encodeURIComponent(token || '')}; Path=/; HttpOnly; SameSite=Strict${secure}; Max-Age=${Math.max(0, maxAgeSeconds || 0)}`;
+}
+function authorizedMain(req) {
+  if (!AUTH_REQUIRED) return true;
+  const token = parseCookies(req).fc_main_session || '';
+  const expires = adminSessions.get(token);
+  if (!expires || expires < Date.now()) {
+    if (token) adminSessions.delete(token);
+    return false;
+  }
+  adminSessions.set(token, Date.now() + SESSION_TTL_MS);
+  return true;
+}
+function loginKey(req) {
+  return String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+}
+function loginBlocked(req) {
+  const key = loginKey(req);
+  const state = loginAttempts.get(key);
+  if (!state) return false;
+  if (state.until && state.until > Date.now()) return true;
+  if (state.until) loginAttempts.delete(key);
+  return false;
+}
+function registerLoginFailure(req) {
+  const key = loginKey(req);
+  const state = loginAttempts.get(key) || { count:0, first:Date.now(), until:0 };
+  if (Date.now() - state.first > 15 * 60 * 1000) { state.count = 0; state.first = Date.now(); }
+  state.count += 1;
+  if (state.count >= 5) state.until = Date.now() + 15 * 60 * 1000;
+  loginAttempts.set(key, state);
+}
+async function handleMainAuthApi(req, res, url) {
+  if (url.pathname === '/api/auth/session' && req.method === 'GET') {
+    send(res, 200, JSON.stringify({ ok:true, authenticated:authorizedMain(req), authRequired:AUTH_REQUIRED, name:ADMIN_NAME }), 'application/json; charset=utf-8');
     return true;
   }
-  if(url.pathname==='/api/senior/session'&&req.method==='GET'){send(res,200,JSON.stringify({ok:true,authenticated:authorizedSenior(req),authRequired:!SENIOR_AUTH_DISABLED,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE,expiresIn:SESSION_TTL_MS}),'application/json; charset=utf-8');return true}
-  if(url.pathname==='/api/senior/logout'&&req.method==='DELETE'){const token=cookies(req).fc_senior_session||'';if(token)seniorSessions.delete(token);res.setHeader('Set-Cookie',seniorCookie('',req,0));send(res,200,'{"ok":true}','application/json; charset=utf-8');return true}
-  if(url.pathname!=='/api/senior/login')return false;
-  if(req.method!=='POST'){send(res,405,'Method not allowed');return true}
-  if(SENIOR_AUTH_DISABLED){send(res,200,JSON.stringify({ok:true,authRequired:false,expiresIn:SESSION_TTL_MS,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE}),'application/json; charset=utf-8');return true}
-  if(loginBlocked(req)){send(res,429,JSON.stringify({ok:false,error:'Prea multe încercări. Reîncearcă peste 15 minute.'}),'application/json; charset=utf-8');return true}
-  try{const b=await readJson(req);if(!sameSecret(b.pin||'',SENIOR_PIN)){loginFailure(req);send(res,401,JSON.stringify({ok:false,error:'PIN incorect'}),'application/json; charset=utf-8');return true}loginAttempts.delete(loginKey(req));const token=crypto.randomBytes(32).toString('base64url');seniorSessions.set(token,Date.now()+SESSION_TTL_MS);res.setHeader('Set-Cookie',seniorCookie(token,req,Math.floor(SESSION_TTL_MS/1000)));send(res,200,JSON.stringify({ok:true,expiresIn:SESSION_TTL_MS,singleEntity:!!SENIOR_ENTITY_CODE,entityCode:SENIOR_ENTITY_CODE}),'application/json; charset=utf-8');return true}catch(e){send(res,400,e.message||'Cerere invalidă');return true}
-}
-async function handleSeniorSoundSettingsApi(req,res,url){
- if(url.pathname!=='/api/senior-sound-settings')return false;
- try{
-  if(req.method==='GET'){
-   const sql=`select coalesce((
-     select jsonb_build_object(
-       'type', case when lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) in ('soft','bell','alert') then lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) else 'soft' end,
-       'volume', case when coalesce(payload->>'Volum', payload->>'volume', '') ~ '^[0-9]+$' then least(100, greatest(0, coalesce(payload->>'Volum', payload->>'volume')::int)) else 70 end,
-       'active', coalesce(payload->>'Activ', payload->>'active', 'da')
-     )::text
-     from ${dq(PGSCHEMA)}.config_record
-     where section_key='senior-sound-settings'
-     order by sort_order, id
-     limit 1
-   ), jsonb_build_object('type','soft','volume',70,'active','da')::text);`;
-   send(res,200,await runPsql(sql)||'{"type":"soft","volume":70,"active":"da"}','application/json; charset=utf-8');return true;
+  if (url.pathname === '/api/auth/login' && req.method === 'POST') {
+    if (!AUTH_REQUIRED) { send(res, 200, JSON.stringify({ ok:true, authRequired:false }), 'application/json; charset=utf-8'); return true; }
+    if (loginBlocked(req)) { send(res, 429, JSON.stringify({ ok:false, error:'Prea multe încercări. Reîncearcă peste 15 minute.' }), 'application/json; charset=utf-8'); return true; }
+    try {
+      const body = await readJson(req);
+      if (!sameSecret(body.password || '', ADMIN_PASSWORD)) {
+        registerLoginFailure(req);
+        send(res, 401, JSON.stringify({ ok:false, error:'Parolă incorectă.' }), 'application/json; charset=utf-8');
+        return true;
+      }
+      loginAttempts.delete(loginKey(req));
+      const token = crypto.randomBytes(32).toString('base64url');
+      adminSessions.set(token, Date.now() + SESSION_TTL_MS);
+      res.setHeader('Set-Cookie', sessionCookie(token, req, Math.floor(SESSION_TTL_MS / 1000)));
+      send(res, 200, JSON.stringify({ ok:true, name:ADMIN_NAME }), 'application/json; charset=utf-8');
+      return true;
+    } catch (e) { send(res, 400, JSON.stringify({ ok:false, error:e.message || 'Cerere invalidă.' }), 'application/json; charset=utf-8'); return true; }
   }
-  send(res,405,'Method not allowed');return true;
- }catch(e){send(res,200,'{"type":"soft","volume":70,"active":"da"}','application/json; charset=utf-8');return true;}
+  if (url.pathname === '/api/auth/logout' && req.method === 'DELETE') {
+    const token = parseCookies(req).fc_main_session || '';
+    if (token) adminSessions.delete(token);
+    res.setHeader('Set-Cookie', sessionCookie('', req, 0));
+    send(res, 200, JSON.stringify({ ok:true }), 'application/json; charset=utf-8');
+    return true;
+  }
+  return false;
 }
 
-async function handleFamilyContactApi(req,res,url) {
-  if (url.pathname !== '/api/family-contact') return false;
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.svg': 'image/svg+xml; charset=utf-8',
+  '.png': 'image/png',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8'
+};
+const SENIOR_PORT = Number(process.env.SENIOR_PORT || 31001);
+const SENIOR_BASE_URL = String(process.env.SENIOR_BASE_URL || '').replace(/\/$/, '');
+function safeOrigin(value) { try { return new URL(value).origin; } catch (_) { return ''; } }
+function seniorFrameSourcesFor(req) {
+  const configured = safeOrigin(SENIOR_BASE_URL);
+  let localSources = '';
   try {
-    const sql = `with contact_source as (
-      select payload, updated_at, id, section_key
-      from ${dq(PGSCHEMA)}.config_record
-      where section_key='family-contact'
-         or (section_key='notification-channels' and lower(coalesce(payload->>'Canal','')) in ('telefon / sms','telefon','sms'))
-         or payload ? 'Telefon principal'
-         or payload ? 'Numar principal'
-         or payload ? 'Număr principal'
-         or payload ? 'Telefon implicit'
-         or payload ? 'phone_primary'
-      order by
-        case when payload ? 'Telefon principal' or payload ? 'Numar principal' or payload ? 'Număr principal' or payload ? 'Telefon implicit' or payload ? 'phone_primary' then 0 else 1 end,
-        updated_at desc nulls last,
-        id desc
-      limit 1
-    ), p as (
-      select coalesce((select payload from contact_source), '{}'::jsonb) as payload
+    const hostname = new URL(PROTOCOL + '://' + String(req.headers.host || 'localhost')).hostname;
+    if (/^[a-z0-9.:-]+$/i.test(hostname)) {
+      const host = hostname.includes(':') ? '[' + hostname + ']' : hostname;
+      localSources = ' http://' + host + ':' + SENIOR_PORT + ' https://' + host + ':' + SENIOR_PORT;
+    }
+  } catch (_) {}
+  return (configured ? ' ' + configured : '') + localSources;
+}
+
+function send(res, status, body, type = 'text/plain; charset=utf-8', extraHeaders = {}) {
+  res.writeHead(status, {
+    'Content-Type': type,
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'X-Permitted-Cross-Domain-Policies': 'none',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-src 'self'" + (res.familyCareSeniorFrameSources || '') + "; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    ...(res.familyCareSecureRequest ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains' } : {}),
+    ...extraHeaders
+  });
+  res.end(body);
+}
+
+function originAllowed(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    const parsed = new URL(origin);
+    const forwardedProto = String(req.headers['x-forwarded-proto'] || PROTOCOL).split(',')[0].trim();
+    return parsed.protocol === forwardedProto + ':' && parsed.host.toLowerCase() === String(req.headers.host || '').toLowerCase();
+  } catch (_) { return false; }
+}
+
+function sectionOk(section) {
+  return /^[a-z0-9-]+$/.test(section || '');
+}
+function idOk(id) {
+  return /^[0-9]+$/.test(String(id || ''));
+}
+function dqIdent(s) {
+  return '"' + String(s).replace(/"/g, '""') + '"';
+}
+function dollar(text) {
+  let tag = 'fc';
+  while (String(text).includes('$' + tag + '$')) tag += 'x';
+  return '$' + tag + '$' + String(text) + '$' + tag + '$';
+}
+
+
+// V1.0.70: configurările esențiale din Main sunt legate direct la tabelele reale citite de Senior.
+// Nu mai salvăm persoane/ramificații doar generic în config_record.
+const DIRECT_CONFIG_SECTIONS = new Set(['care-header','branches','care-persons','users','doctors','providers']);
+function makeCode(prefix) {
+  return prefix + '-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+}
+function activeSql(value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  return ['nu','no','false','0','inactiv','inactive','off'].includes(v) ? 'false' : 'true';
+}
+function seniorScreenSql(value) {
+  const v = String(value ?? '').trim().toLowerCase();
+  return /senior|senioră|seniora|beneficiar/.test(v) ? 'true' : 'false';
+}
+function firstHeaderCte() {
+  return `h0 as (select id from ${dqIdent(PGSCHEMA)}.care_header where coalesce(active,true)=true order by id limit 1),
+    h_ins as (
+      insert into ${dqIdent(PGSCHEMA)}.care_header(header_code,name,context_type,coordinator_name,description,active)
+      select ${dollar(makeCode('CH'))}, 'FamilyCare', 'familie_proprie', '', 'Creat automat de FamilyCare Main', true
+      where not exists(select 1 from h0)
+      returning id
+    ),
+    h as (select id from h0 union all select id from h_ins limit 1)`;
+}
+function directConfigSelectSql(section) {
+  const q = dqIdent(PGSCHEMA);
+  if (section === 'care-header') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select id, 'care-header' as section_key,
+      jsonb_build_object('Denumire',name,'Tip context',context_type,'Coordonator',coalesce(coordinator_name,''),'Detalii',coalesce(description,'')) as payload,
+      id as sort_order
+    from ${q}.care_header where coalesce(active,true)=true order by id
+  ) t;`;
+  if (section === 'branches') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select b.id, 'branches' as section_key,
+      jsonb_build_object('Denumire ramificație',b.name,'Tip',b.branch_type,'Oraș',coalesce(b.city,''),'Coordonator',coalesce(b.coordinator_name,'')) as payload,
+      b.sort_order
+    from ${q}.care_branch b where coalesce(b.active,true)=true order by b.sort_order,b.id
+  ) t;`;
+  if (section === 'care-persons') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select e.id, 'care-persons' as section_key,
+      jsonb_build_object('Denumire',e.display_name,'Tip entitate',e.entity_type,'Ramificație',coalesce(b.name,''),'Adresă / detalii',coalesce(e.address_notes,e.access_details,concat_ws(', ',e.country,e.city,e.street,e.street_no),''),'Responsabil',coalesce(e.notes,'')) as payload,
+      e.id as sort_order
+    from ${q}.managed_entity e
+    left join ${q}.care_branch b on b.id=e.care_branch_id
+    where coalesce(e.active,true)=true
+    order by coalesce(b.sort_order,9999),e.display_name,e.id
+  ) t;`;
+  if (section === 'users') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select id, 'users' as section_key,
+      jsonb_build_object('Nume',display_name,'Email',coalesce(email,''),'Rol',role_key,'Domiciliu complet',coalesce(address_notes,concat_ws(', ',country,city,street,street_no),'')) as payload,
+      id as sort_order
+    from ${q}.app_user where coalesce(active,true)=true order by display_name,id
+  ) t;`;
+  if (section === 'doctors') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select id, 'doctors' as section_key,
+      jsonb_build_object('Nume medic',full_name,'Specialitate',coalesce(specialty,''),'Telefon',coalesce(phone,''),'Domiciliu/cabinet',coalesce(clinic_name,address_notes,concat_ws(', ',country,city,street,street_no),'')) as payload,
+      id as sort_order
+    from ${q}.doctor where coalesce(active,true)=true order by full_name,id
+  ) t;`;
+  if (section === 'providers') return `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+    select id, 'providers' as section_key,
+      jsonb_build_object('Denumire',name,'Tip furnizor',provider_type,'Telefon',coalesce(phone,''),'Adresă completă',coalesce(address_notes,concat_ws(', ',country,city,street,street_no),'')) as payload,
+      id as sort_order
+    from ${q}.provider where coalesce(active,true)=true order by name,id
+  ) t;`;
+  return null;
+}
+function directConfigInsertSql(section, b) {
+  const q = dqIdent(PGSCHEMA);
+  if (section === 'care-header') return `insert into ${q}.care_header(header_code,name,context_type,coordinator_name,description,active)
+    values (${dollar(makeCode('CH'))}, ${dollar(b['Denumire']||'FamilyCare')}, ${dollar(b['Tip context']||'familie_proprie')}, ${dollar(b['Coordonator']||'')}, ${dollar(b['Detalii']||'')}, true)
+    returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'branches') return `with ${firstHeaderCte()}
+    insert into ${q}.care_branch(care_header_id,branch_code,name,branch_type,coordinator_name,city,description,sort_order,active)
+    select id, ${dollar(makeCode('CB'))}, ${dollar(b['Denumire ramificație']||'Ramificație')}, ${dollar(b['Tip']||'familie')}, ${dollar(b['Coordonator']||'')}, ${dollar(b['Oraș']||'')}, '', 100, true from h
+    returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'care-persons') {
+    const branch = String(b['Ramificație']||'').trim();
+    return `with ${firstHeaderCte()}, br as (
+      select id from ${q}.care_branch where coalesce(active,true)=true and (branch_code=${dollar(branch)} or name=${dollar(branch)}) order by id limit 1
     )
-    select jsonb_build_object(
-      'Nume', coalesce(payload->>'Nume', payload->>'Contact', 'Contact familie'),
-      'Email', coalesce(payload->>'Email', payload->>'Email principal', 'contact@example.com'),
-      'Mesaj SMS', coalesce(payload->>'Mesaj SMS', payload->>'Mesaj mesaj', payload->>'Mesaj implicit', 'Te rog să mă contactezi.'),
-      'Mesaj ajutor', coalesce(payload->>'Mesaj ajutor', payload->>'Mesaj urgență', payload->>'Mesaj implicit', 'Am nevoie de ajutor. Te rog să mă contactezi urgent.'),
-      'Contacte', jsonb_build_array(
-        jsonb_build_object(
-          'Etichetă','Principal',
-          'Nume',coalesce(payload->>'Nume principal', payload->>'Nume', 'Contact principal'),
-          'Telefon',coalesce(payload->>'Telefon principal', payload->>'Numar principal', payload->>'Număr principal', payload->>'Telefon implicit', payload->>'phone_primary', payload->>'Telefon', '0700000001')
-        ),
-        jsonb_build_object(
-          'Etichetă','Secundar',
-          'Nume',coalesce(payload->>'Nume secundar', 'Contact secundar'),
-          'Telefon',coalesce(payload->>'Telefon secundar', payload->>'Numar secundar', payload->>'Număr secundar', payload->>'phone_secondary', '0700000002')
-        ),
-        jsonb_build_object(
-          'Etichetă','Al treilea',
-          'Nume',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Contact rezervă'),
-          'Telefon',coalesce(payload->>'Telefon al treilea', payload->>'Telefon urgență', payload->>'Telefon urgenta', payload->>'Numar al treilea', payload->>'Număr al treilea', payload->>'phone_third', '0700000003')
-        )
-      )
-    )::text from p;`;
+    insert into ${q}.managed_entity(care_header_id,care_branch_id,entity_code,entity_type,display_name,allows_senior_screen,address_notes,notes,active)
+    select h.id, (select id from br), ${dollar(makeCode('ME'))}, ${dollar(b['Tip entitate']||'senior')}, ${dollar(b['Denumire']||'Senior')}, ${seniorScreenSql(b['Tip entitate']||'senior')}, ${dollar(b['Adresă / detalii']||'')}, ${dollar(b['Responsabil']||'')}, true from h
+    returning json_build_object('ok',true,'id',id)::text;`;
+  }
+  if (section === 'users') return `insert into ${q}.app_user(user_code,display_name,email,role_key,address_notes,active)
+    values (${dollar(makeCode('USR'))}, ${dollar(b['Nume']||'Utilizator')}, ${dollar(b['Email']||'')}, ${dollar(b['Rol']||'family_member')}, ${dollar(b['Domiciliu complet']||'')}, true)
+    returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'doctors') return `insert into ${q}.doctor(doctor_code,full_name,specialty,phone,clinic_name,active)
+    values (${dollar(makeCode('DR'))}, ${dollar(b['Nume medic']||'Medic')}, ${dollar(b['Specialitate']||'')}, ${dollar(b['Telefon']||'')}, ${dollar(b['Domiciliu/cabinet']||'')}, true)
+    returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'providers') return `insert into ${q}.provider(provider_code,name,provider_type,phone,address_notes,active)
+    values (${dollar(makeCode('PR'))}, ${dollar(b['Denumire']||'Furnizor')}, ${dollar(b['Tip furnizor']||'servicii')}, ${dollar(b['Telefon']||'')}, ${dollar(b['Adresă completă']||'')}, true)
+    returning json_build_object('ok',true,'id',id)::text;`;
+  return null;
+}
+function directConfigUpdateSql(section, id, b) {
+  const q = dqIdent(PGSCHEMA);
+  const n = Number(id);
+  if (section === 'care-header') return `update ${q}.care_header set name=${dollar(b['Denumire']||'FamilyCare')}, context_type=${dollar(b['Tip context']||'familie_proprie')}, coordinator_name=${dollar(b['Coordonator']||'')}, description=${dollar(b['Detalii']||'')}, updated_at=now() where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'branches') return `update ${q}.care_branch set name=${dollar(b['Denumire ramificație']||'Ramificație')}, branch_type=${dollar(b['Tip']||'familie')}, city=${dollar(b['Oraș']||'')}, coordinator_name=${dollar(b['Coordonator']||'')}, updated_at=now() where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'care-persons') {
+    const branch = String(b['Ramificație']||'').trim();
+    return `with br as (select id from ${q}.care_branch where coalesce(active,true)=true and (branch_code=${dollar(branch)} or name=${dollar(branch)}) order by id limit 1)
+      update ${q}.managed_entity set display_name=${dollar(b['Denumire']||'Senior')}, entity_type=${dollar(b['Tip entitate']||'senior')}, care_branch_id=(select id from br), allows_senior_screen=${seniorScreenSql(b['Tip entitate']||'senior')}, address_notes=${dollar(b['Adresă / detalii']||'')}, notes=${dollar(b['Responsabil']||'')}, updated_at=now()
+      where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  }
+  if (section === 'users') return `update ${q}.app_user set display_name=${dollar(b['Nume']||'Utilizator')}, email=${dollar(b['Email']||'')}, role_key=${dollar(b['Rol']||'family_member')}, address_notes=${dollar(b['Domiciliu complet']||'')}, updated_at=now() where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'doctors') return `update ${q}.doctor set full_name=${dollar(b['Nume medic']||'Medic')}, specialty=${dollar(b['Specialitate']||'')}, phone=${dollar(b['Telefon']||'')}, clinic_name=${dollar(b['Domiciliu/cabinet']||'')}, updated_at=now() where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  if (section === 'providers') return `update ${q}.provider set name=${dollar(b['Denumire']||'Furnizor')}, provider_type=${dollar(b['Tip furnizor']||'servicii')}, phone=${dollar(b['Telefon']||'')}, address_notes=${dollar(b['Adresă completă']||'')}, updated_at=now() where id=${n} returning json_build_object('ok',true,'id',id)::text;`;
+  return null;
+}
+function directConfigDeleteSql(section, id) {
+  const q = dqIdent(PGSCHEMA);
+  const n = Number(id);
+  const table = { 'care-header':'care_header', branches:'care_branch', 'care-persons':'managed_entity', users:'app_user', doctors:'doctor', providers:'provider' }[section];
+  if (!table) return null;
+  return `update ${q}.${dqIdent(table).replace(/"/g,'')} set active=false, updated_at=now() where id=${n}; select json_build_object('ok',true)::text;`;
+}
+async function handleDirectConfigApi(req, res, section, id) {
+  if (!DIRECT_CONFIG_SECTIONS.has(section)) return false;
+  try {
+    let sql = null;
+    if (req.method === 'GET' && !id) sql = directConfigSelectSql(section);
+    else if (req.method === 'POST' && !id) sql = directConfigInsertSql(section, await readJson(req));
+    else if (req.method === 'PUT' && idOk(id)) sql = directConfigUpdateSql(section, id, await readJson(req));
+    else if (req.method === 'DELETE' && idOk(id)) sql = directConfigDeleteSql(section, id);
+    else { send(res, 405, 'Method not allowed'); return true; }
     const out = await runPsql(sql);
-    send(res,200, out || '{}', 'application/json; charset=utf-8');
+    send(res, 200, (req.method === 'GET' ? (out || '[]') : (String(out||'').split('\n').pop() || '{"ok":true}')), 'application/json; charset=utf-8');
+    return true;
+  } catch (e) {
+    send(res, 500, e.message || 'Database error');
+    return true;
+  }
+}
+
+let pgPool = null;
+let PgPoolCtor = null;
+function getPgPool() {
+  if (!process.env.DATABASE_URL) return null;
+  if (!PgPoolCtor) {
+    try { PgPoolCtor = require('pg').Pool; }
+    catch (e) { throw new Error('Lipsește dependența pg. Rulează npm install sau verifică package.json.'); }
+  }
+  if (!pgPool) {
+    const sslMode = String(process.env.PGSSLMODE || '').toLowerCase();
+    const sslDisabled = ['disable','disabled','false','0','no'].includes(sslMode) || String(process.env.DATABASE_SSL || '').toLowerCase() === 'false';
+    const sslRequired = ['require','true','1','yes'].includes(sslMode) || String(process.env.DATABASE_SSL || '').toLowerCase() === 'true' || !!process.env.RENDER;
+    pgPool = new PgPoolCtor({
+      connectionString: process.env.DATABASE_URL,
+      ssl: sslDisabled ? false : (sslRequired ? { rejectUnauthorized: false } : undefined),
+      max: Number(process.env.PGPOOL_MAX || 5),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 15000
+    });
+  }
+  return pgPool;
+}
+function stringifyPgValue(value) {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return value.toISOString();
+  if (Buffer.isBuffer(value)) return value.toString('utf8');
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+function formatPgOutput(result) {
+  const results = Array.isArray(result) ? result : [result];
+  const lastWithRows = [...results].reverse().find(r => r && Array.isArray(r.rows));
+  if (!lastWithRows || !lastWithRows.rows.length) return '';
+  return lastWithRows.rows.map(row => {
+    const vals = Object.values(row);
+    if (vals.length === 1) return stringifyPgValue(vals[0]);
+    return vals.map(stringifyPgValue).join('|');
+  }).join('\n').trim();
+}
+function runPsql(sql) {
+  const pool = getPgPool();
+  if (pool) {
+    return pool.query(sql).then(formatPgOutput).catch(err => {
+      throw new Error(err && err.message ? err.message : 'PostgreSQL query failed');
+    });
+  }
+  return new Promise((resolve, reject) => {
+    const file = path.join(os.tmpdir(), 'familycare_' + Date.now() + '_' + Math.random().toString(16).slice(2) + '.sql');
+    fs.writeFileSync(file, sql, 'utf8');
+    const args = ['-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1', '-f', file];
+    const env = { ...process.env };
+    execFile(PSQL_BIN, args, { env, windowsHide: true, timeout: 15000 }, (err, stdout, stderr) => {
+      try { fs.unlinkSync(file); } catch (_) {}
+      if (err) {
+        const msg = (stderr || err.message || '').trim();
+        reject(new Error(msg || 'PostgreSQL command failed'));
+        return;
+      }
+      resolve(String(stdout || '').trim());
+    });
+  });
+}
+
+async function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; if (data.length > 2_000_000) reject(new Error('Body too large')); });
+    req.on('end', () => {
+      try { resolve(data ? JSON.parse(data) : {}); } catch (e) { reject(new Error('Invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
+}
+
+
+
+
+
+async function handleMailSettingsApi(req, res, url) {
+  if (url.pathname !== '/api/mail-settings') return false;
+  try {
+    if (req.method === 'GET') {
+      const sql = `select coalesce((
+        select jsonb_build_object(
+          'ok', true,
+          'configured', true,
+          'email', payload->>'Email',
+          'provider', case
+            when lower(coalesce(payload->>'Email','')) like '%@gmail.com' then 'Gmail'
+            when lower(coalesce(payload->>'Email','')) like '%@yahoo.%' then 'Yahoo'
+            when lower(coalesce(payload->>'Email','')) ~ '@(outlook|hotmail|live)\.com$' then 'Outlook'
+            else 'Auto'
+          end,
+          'active', coalesce(payload->>'Activ','da'),
+          'passwordConfigured', (coalesce(payload->>'Secret SMTP', payload->>'Parolă', payload->>'Parola', '') <> ''),
+          'encrypted', (coalesce(payload->>'Secret SMTP','') like 'enc:v1:%')
+        )::text
+        from ${dqIdent(PGSCHEMA)}.config_record
+        where section_key='mail-settings'
+        order by id desc
+        limit 1
+      ), jsonb_build_object('ok',true,'configured',false)::text);`;
+      send(res, 200, await runPsql(sql) || '{"ok":true,"configured":false}', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      const email = String(b.email || b.Email || '').trim();
+      const password = String(b.password || b['Parolă'] || '').trim();
+      const active = b.active === false ? 'nu' : 'da';
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { send(res, 400, 'Email expeditor invalid.'); return true; }
+      let existing = {};
+      try {
+        const oldSql = `select coalesce((select payload::text from ${dqIdent(PGSCHEMA)}.config_record where section_key='mail-settings' order by id desc limit 1), '{}');`;
+        existing = JSON.parse(await runPsql(oldSql) || '{}');
+      } catch (_) {}
+      const existingSecret = existing['Secret SMTP'] || existing['Parolă'] || existing.Parola || '';
+      const protectedSecret = password ? encryptMailSecret(password) : existingSecret;
+      if (!protectedSecret) { send(res, 400, 'Parola SMTP este obligatorie la prima configurare.'); return true; }
+      if (!String(protectedSecret).startsWith('enc:v1:')) {
+        if (!mailSecretKey()) { send(res, 400, 'Configurează MAIL_SECRET_KEY înainte de a salva parola SMTP.'); return true; }
+      }
+      const finalSecret = String(protectedSecret).startsWith('enc:v1:') ? protectedSecret : encryptMailSecret(protectedSecret);
+      const payload = JSON.stringify({ Email: email, 'Secret SMTP': finalSecret, Activ: active, Provider: inferSmtp(email).provider, 'Setat din interfață': 'da', 'Protecție secret':'AES-256-GCM' });
+      const sql = `with old as (delete from ${dqIdent(PGSCHEMA)}.config_record where section_key='mail-settings')
+        insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order)
+        values ('mail-settings', ${dollar(payload)}::jsonb, 1)
+        returning json_build_object('ok',true,'provider',payload->>'Provider','email',payload->>'Email')::text;`;
+      send(res, 200, await runPsql(sql) || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'DELETE') {
+      const sql = `delete from ${dqIdent(PGSCHEMA)}.config_record where section_key='mail-settings'; select json_build_object('ok',true)::text;`;
+      const out = await runPsql(sql);
+      send(res, 200, out.split('\n').pop() || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    send(res,405,'Method not allowed');
     return true;
   } catch(e) {
-    send(res,200, JSON.stringify({
+    send(res, 500, e.message || 'Mail settings error');
+    return true;
+  }
+}
+
+async function handleSeniorSoundSettingsApi(req, res, url) {
+  if (url.pathname !== '/api/senior-sound-settings') return false;
+  try {
+    if (req.method === 'GET') {
+      const sql = `select coalesce((
+        select jsonb_build_object(
+          'type', case when lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) in ('soft','bell','alert') then lower(coalesce(payload->>'Tip sunet', payload->>'type', 'soft')) else 'soft' end,
+          'volume', case when coalesce(payload->>'Volum', payload->>'volume', '') ~ '^[0-9]+$' then least(100, greatest(0, coalesce(payload->>'Volum', payload->>'volume')::int)) else 70 end,
+          'active', coalesce(payload->>'Activ', payload->>'active', 'da')
+        )::text
+        from ${dqIdent(PGSCHEMA)}.config_record
+        where section_key='senior-sound-settings'
+        order by sort_order, id
+        limit 1
+      ), jsonb_build_object('type','soft','volume',70,'active','da')::text);`;
+      send(res, 200, await runPsql(sql) || '{"type":"soft","volume":70,"active":"da"}', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      const type = ['soft','bell','alert'].includes(String(b.type || b['Tip sunet'] || '').toLowerCase()) ? String(b.type || b['Tip sunet']).toLowerCase() : 'soft';
+      const volume = Math.max(0, Math.min(100, Number(b.volume ?? b.Volum ?? 70) || 70));
+      const active = String(b.active ?? b.Activ ?? 'da');
+      const payload = JSON.stringify({ 'Tip sunet': type, Volum: String(volume), Activ: active });
+      const sql = `with old as (delete from ${dqIdent(PGSCHEMA)}.config_record where section_key='senior-sound-settings')
+        insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order)
+        values ('senior-sound-settings', ${dollar(payload)}::jsonb, 1)
+        returning json_build_object('ok',true,'type',payload->>'Tip sunet','volume',payload->>'Volum')::text;`;
+      send(res, 200, await runPsql(sql) || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    send(res, 405, 'Method not allowed');
+    return true;
+  } catch(e) {
+    send(res, 500, e.message || 'Sound settings error');
+    return true;
+  }
+}
+
+async function handleFamilyContactApi(req, res, url) {
+  if (url.pathname !== '/api/family-contact') return false;
+  try {
+    const sql = `select coalesce((
+      select jsonb_build_object(
+        'Nume', coalesce(payload->>'Nume', 'Contact familie'),
+        'Email', coalesce(payload->>'Email', 'contact@example.com'),
+        'Mesaj SMS', coalesce(payload->>'Mesaj SMS', payload->>'Mesaj implicit', 'Te rog să mă contactezi.'),
+        'Mesaj ajutor', coalesce(payload->>'Mesaj ajutor', payload->>'Mesaj implicit', 'Am nevoie de ajutor. Te rog să mă contactezi.'),
+        'Contacte', jsonb_build_array(
+          jsonb_build_object('Etichetă','Principal','Nume',coalesce(payload->>'Nume principal', payload->>'Nume', 'Contact principal'),'Telefon',coalesce(payload->>'Telefon principal', payload->>'Telefon', '0700000001')),
+          jsonb_build_object('Etichetă','Secundar','Nume',coalesce(payload->>'Nume secundar','Contact secundar'),'Telefon',coalesce(payload->>'Telefon secundar','0700000002')),
+          jsonb_build_object('Etichetă','Al treilea','Nume',coalesce(payload->>'Nume al treilea','Contact rezervă'),'Telefon',coalesce(payload->>'Telefon al treilea', payload->>'Telefon urgență', '0700000003'))
+        )
+      )::text
+      from ${dqIdent(PGSCHEMA)}.config_record
+      where section_key='family-contact'
+      order by sort_order, id
+      limit 1
+    ), jsonb_build_object(
+        'Nume','Contact familie',
+        'Email','contact@example.com',
+        'Mesaj SMS','Te rog să mă contactezi.',
+        'Mesaj ajutor','Am nevoie de ajutor. Te rog să mă contactezi.',
+        'Contacte', jsonb_build_array(
+          jsonb_build_object('Etichetă','Principal','Nume','Contact principal','Telefon','0700000001'),
+          jsonb_build_object('Etichetă','Secundar','Nume','Contact secundar','Telefon','0700000002'),
+          jsonb_build_object('Etichetă','Al treilea','Nume','Contact rezervă','Telefon','0700000003')
+        )
+      )::text);`;
+    const out = await runPsql(sql);
+    send(res, 200, out || '{}', 'application/json; charset=utf-8');
+    return true;
+  } catch(e) {
+    send(res, 200, JSON.stringify({
       Nume:'Contact familie', Email:'contact@example.com',
       'Mesaj SMS':'Te rog să mă contactezi.',
-      'Mesaj ajutor':'Am nevoie de ajutor. Te rog să mă contactezi urgent.',
+      'Mesaj ajutor':'Am nevoie de ajutor. Te rog să mă contactezi.',
       Contacte:[
         {'Etichetă':'Principal', Nume:'Contact principal', Telefon:'0700000001'},
         {'Etichetă':'Secundar', Nume:'Contact secundar', Telefon:'0700000002'},
@@ -339,10 +740,226 @@ async function handleFamilyContactApi(req,res,url) {
     return true;
   }
 }
-async function handleQuickActionApi(req,res,url){
- if(url.pathname!=='/api/quick-action') return false;
- if(req.method!=='POST'){send(res,405,'Method not allowed'); return true}
- try{const b=await readJson(req); const payload=JSON.stringify({Actiune:b.action||'actiune',Entitate:b.entityName||'',Mesaj:b.message||'',Data:new Date().toISOString()}); const sql=`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('senior-actions', ${dollar(payload)}::jsonb, 100) returning json_build_object('ok',true,'id',id)::text;`; const out=await runPsql(sql); send(res,200,out||'{"ok":true}','application/json; charset=utf-8'); return true;}catch(e){send(res,500,e.message||'Database error'); return true}
+
+async function handleQuickActionApi(req, res, url) {
+  if (url.pathname !== '/api/quick-action') return false;
+  if (req.method !== 'POST') { send(res,405,'Method not allowed'); return true; }
+  try {
+    const b = await readJson(req);
+    const payload = JSON.stringify({
+      Actiune: b.action || 'actiune',
+      Entitate: b.entityName || '',
+      Mesaj: b.message || '',
+      Data: new Date().toISOString()
+    });
+    const sql = `insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('senior-actions', ${dollar(payload)}::jsonb, 100) returning json_build_object('ok',true,'id',id)::text;`;
+    const out = await runPsql(sql);
+    send(res, 200, out || '{"ok":true}', 'application/json; charset=utf-8');
+    return true;
+  } catch(e) {
+    send(res, 500, e.message || 'Database error');
+    return true;
+  }
+}
+
+async function handleSeniorEntitiesApi(req, res, url) {
+  if (url.pathname !== '/api/senior/entities' && url.pathname !== '/api/entities') return false;
+  try {
+    const branchCode = url.searchParams.get('branchCode') || '';
+    const filter = branchCode ? `where coalesce(e.active,true)=true and (coalesce(b.branch_code,'')=${dollar(branchCode)} or coalesce(to_jsonb(e)->>'branch_name','') in (select name from ${dqIdent(PGSCHEMA)}.care_branch where branch_code=${dollar(branchCode)}))` : `where coalesce(e.active,true)=true`;
+    const sql = `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+      select
+        e.id,
+        e.entity_code,
+        coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as name,
+        e.entity_type,
+        coalesce(b.branch_code, to_jsonb(e)->>'branch_code') as branch_code,
+        coalesce(b.name, to_jsonb(e)->>'branch_name') as branch_name,
+        coalesce(to_jsonb(e)->>'address_details', e.address_notes, e.access_details, concat_ws(', ', to_jsonb(e)->>'country', to_jsonb(e)->>'city', to_jsonb(e)->>'street', to_jsonb(e)->>'street_no')) as address_details,
+        coalesce(to_jsonb(e)->>'responsible_name', e.notes, '') as responsible_name,
+        coalesce(to_jsonb(e)->>'allows_senior_screen','false') as allows_senior_screen,
+        coalesce(card_style.card_color,'') as card_color,
+        coalesce(card_style.card_text_color,'') as card_text_color
+      from ${dqIdent(PGSCHEMA)}.managed_entity e
+      left join ${dqIdent(PGSCHEMA)}.care_branch b on b.id=e.care_branch_id
+      left join lateral (
+        select
+          c.payload->>'Culoare fundal' as card_color,
+          c.payload->>'Culoare text' as card_text_color
+        from ${dqIdent(PGSCHEMA)}.config_record c
+        where c.section_key='senior-card-colors'
+          and coalesce(c.payload->>'Cod entitate','')=e.entity_code
+        order by c.id desc
+        limit 1
+      ) card_style on true
+      ${filter}
+      order by b.sort_order nulls last, coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code)
+    ) t;`;
+    const out = await runPsql(sql);
+    send(res, 200, out || '[]', 'application/json; charset=utf-8');
+    return true;
+  } catch(e) {
+    send(res, 500, e.message || 'Database error');
+    return true;
+  }
+}
+
+async function handleTreatmentApi(req, res, url) {
+  const m = url.pathname.match(/^\/api\/treatment\/?([0-9]+)?$/);
+  if (!m) return false;
+  const itemId = m[1] ? Number(m[1]) : null;
+  const table = dqIdent(PGSCHEMA) + '.calendar_series';
+  try {
+    if (req.method === 'GET' && !itemId) {
+      const sql = `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+        select
+          cs.id, cs.section_key, cs.task_type, cs.title, cs.description,
+          cs.start_date, cs.end_date, cs.start_time, cs.recurrence_rule,
+          cs.repeat_every_days, cs.active_weekdays, cs.escalation_minutes,
+          cs.email_on_create, cs.email_on_finish, cs.email_recipients,
+          cs.status,
+          e.entity_code,
+          coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as entity_name,
+          br.branch_code,
+          br.name as branch_name
+        from ${table} cs
+        left join ${dqIdent(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id
+        left join ${dqIdent(PGSCHEMA)}.care_branch br on br.id=cs.care_branch_id
+        where cs.section_key='treatment'
+          and coalesce(cs.active,true)=true
+          and lower(coalesce(cs.status,'active')) not in ('cancelled','canceled','anulat','anulată','anulata')
+        order by cs.start_time nulls last, cs.id desc
+      ) t;`;
+      const out = await runPsql(sql);
+      send(res, 200, out || '[]', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'POST' && !itemId) {
+      const b = await readJson(req);
+      const title = b.treatmentName || 'Tratament';
+      const desc = [b.treatmentType, b.dose, b.instructions, b.responsible].filter(Boolean).join(' · ');
+      const startDate = b.startDate || new Date().toISOString().slice(0,10);
+      const endDate = b.endDate || startDate;
+      const startTime = b.startTime || '09:00';
+      const recurrence = b.recurrenceRule || 'selected_weekdays';
+      const repeatDays = Number(b.repeatEveryDays || 0) || null;
+      const weekdays = b.activeWeekdays || '';
+      const esc = Number(b.escalationMinutes || 30) || 30;
+      const emailOnCreate = b.emailOnCreate ? 'true' : 'false';
+      const emailOnFinish = b.emailOnFinish ? 'true' : 'false';
+      const recipients = b.emailRecipients || '';
+      const entityCodes = Array.isArray(b.entityCodes) && b.entityCodes.length ? b.entityCodes : [b.entityCode || 'ME-0001'];
+      const entityList = entityCodes.map(x => dollar(x)).join(',');
+      const sql = `
+        with src as (
+          select e.care_header_id as header_id, e.care_branch_id as branch_id, e.id as entity_id
+          from ${dqIdent(PGSCHEMA)}.managed_entity e
+          where e.entity_code in (${entityList})
+        ), ins as (
+          insert into ${table}(care_header_id, care_branch_id, entity_id, section_key, task_type, title, description, start_date, end_date, start_time, recurrence_rule, repeat_every_days, active_weekdays, escalation_minutes, email_on_create, email_on_finish, email_recipients, status, active)
+          select header_id, branch_id, entity_id, 'treatment', ${dollar(b.treatmentType || 'medication')}, ${dollar(title)}, ${dollar(desc)}, ${dollar(startDate)}::date, ${dollar(endDate)}::date, ${dollar(startTime)}::time, ${dollar(recurrence)}, ${repeatDays === null ? 'null' : repeatDays}, ${dollar(weekdays)}, ${esc}, ${emailOnCreate}, ${emailOnFinish}, ${dollar(recipients)}, 'active', true
+          from src
+          returning id
+        ), mailq as (
+          insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order)
+          select 'email-outbox', jsonb_build_object(
+            'Status','pregătit',
+            'Tip','Tratament creat',
+            'Către',${dollar(recipients)},
+            'Subiect',${dollar('FamilyCare - tratament nou: ' + title)},
+            'Mesaj',${dollar('A fost creat un tratament nou în FamilyCare. Tratament: ' + title + '. Ora: ' + startTime + '.')},
+            'Tratament',${dollar(title)},
+            'Ora',${dollar(startTime)},
+            'Creat la',now()::text
+          ), 10
+          where ${emailOnCreate} and length(trim(${dollar(recipients)})) > 0 and exists(select 1 from ins)
+          returning id
+        ), cnt as (select count(*)::int as inserted from ins), mcnt as (select count(*)::int as email_queued from mailq)
+        select case when (select inserted from cnt) > 0 then
+          json_build_object('ok',true,'inserted',(select inserted from cnt),'email_queued',(select email_queued from mcnt),'entity_codes',${dollar(entityCodes.join(','))},'entity_label',${dollar(b.entityLabel || '')})::text
+        else
+          json_build_object('ok',false,'error','Nu am găsit persoana/entitatea selectată în baza de date.')::text
+        end;`;
+      const out = await runPsql(sql);
+      let parsed = null;
+      try { parsed = JSON.parse(out); } catch (_) {}
+      if (!out || (parsed && parsed.ok === false)) {
+        send(res, 400, parsed && parsed.error ? parsed.error : (out || 'Tratamentul nu a fost inserat.'));
+        return true;
+      }
+      if (parsed && parsed.ok && b.emailOnCreate && recipients) {
+        const subject = 'FamilyCare - tratament nou: ' + title;
+        const msg = [
+          'A fost creat un tratament nou în FamilyCare.',
+          '',
+          'Seniori / persoane: ' + (b.entityLabel || entityCodes.join(', ')),
+          'Tratament: ' + title,
+          'Ora: ' + startTime,
+          'Începe la: ' + startDate,
+          'Până la: ' + endDate
+        ].join('\n');
+        const mailRes = await sendAndLog('Tratament creat', recipients, subject, msg);
+        parsed.email_sent = !!mailRes.ok;
+        parsed.email_status = mailRes.ok ? 'trimis' : (mailRes.reason || mailRes.error || 'neexpediat');
+        send(res, 200, JSON.stringify(parsed), 'application/json; charset=utf-8');
+        return true;
+      }
+      send(res, 200, out, 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'PUT' && itemId) {
+      const b = await readJson(req);
+      const title = b.treatmentName || b.title || 'Tratament';
+      const desc = [b.treatmentType, b.dose, b.instructions, b.responsible].filter(Boolean).join(' · ');
+      const startDate = b.startDate || new Date().toISOString().slice(0,10);
+      const endDate = b.endDate || startDate;
+      const startTime = b.startTime || '09:00';
+      const recurrence = b.recurrenceRule || 'selected_weekdays';
+      const repeatDays = Number(b.repeatEveryDays || 0) || null;
+      const weekdays = b.activeWeekdays || '';
+      const esc = Number(b.escalationMinutes || 30) || 30;
+      const emailOnCreate = b.emailOnCreate ? 'true' : 'false';
+      const emailOnFinish = b.emailOnFinish ? 'true' : 'false';
+      const recipients = b.emailRecipients || '';
+      const entityCode = (Array.isArray(b.entityCodes) && b.entityCodes[0]) || b.entityCode || '';
+      const entityUpdate = entityCode ? `, care_header_id = e.care_header_id, care_branch_id = e.care_branch_id, entity_id = e.id` : '';
+      const fromJoin = entityCode ? ` from ${dqIdent(PGSCHEMA)}.managed_entity e where cs.id=${itemId} and e.entity_code=${dollar(entityCode)} ` : ` where cs.id=${itemId} `;
+      const sql = `
+        update ${table} cs set
+          task_type=${dollar(b.treatmentType || 'medication')},
+          title=${dollar(title)},
+          description=${dollar(desc)},
+          start_date=${dollar(startDate)}::date,
+          end_date=${dollar(endDate)}::date,
+          start_time=${dollar(startTime)}::time,
+          recurrence_rule=${dollar(recurrence)},
+          repeat_every_days=${repeatDays === null ? 'null' : repeatDays},
+          active_weekdays=${dollar(weekdays)},
+          escalation_minutes=${esc},
+          email_on_create=${emailOnCreate},
+          email_on_finish=${emailOnFinish},
+          email_recipients=${dollar(recipients)},
+          updated_at=now()
+          ${entityUpdate}
+        ${fromJoin}
+        returning json_build_object('ok',true,'id',cs.id)::text;`;
+      const out = await runPsql(sql);
+      if (!out) { send(res, 404, 'Tratamentul nu a fost găsit.'); return true; }
+      send(res, 200, out, 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'DELETE' && itemId) {
+      const sql = `update ${table} set active=false, status='cancelled', updated_at=now() where id=${itemId}; select json_build_object('ok',true,'id',${itemId})::text;`;
+      const out = await runPsql(sql);
+      send(res, 200, out.split('\n').pop() || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    send(res, 405, 'Method not allowed');
+    return true;
+  } catch(e) {
+    send(res, 500, e.message || 'Database error');
+    return true;
+  }
 }
 
 
@@ -360,17 +977,12 @@ async function handleTreatmentConfirmApi(req, res, url) {
       Tip:'confirmare-tratament', Tratament:title, Senior:entityName, Ora:startTime,
       OccurrenceKey:occurrenceKey, ConfirmatLa:new Date().toISOString()
     });
-    const decisionPayload = JSON.stringify({
-      Senior:entityName, Tratament:title, 'Ora planificată':startTime,
-      Decizie:'Administrat / efectuat', Motiv:'', 'Înregistrat la':new Date().toISOString(),
-      OccurrenceKey:occurrenceKey, 'ID tratament':treatmentId || ''
-    });
     let cfg = null;
     if (treatmentId) {
-      const q = `select coalesce((select jsonb_build_object('email_on_finish',email_on_finish,'email_recipients',email_recipients,'title',title,'start_time',start_time::text)::text from ${dq(PGSCHEMA)}.calendar_series where id=${treatmentId}), '{}');`;
+      const q = `select coalesce((select jsonb_build_object('email_on_finish',email_on_finish,'email_recipients',email_recipients,'title',title,'start_time',start_time::text)::text from ${dqIdent(PGSCHEMA)}.calendar_series where id=${treatmentId}), '{}');`;
       try { cfg = JSON.parse(await runPsql(q) || '{}'); } catch(_) { cfg = {}; }
     }
-    await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('treatment-confirmations', ${dollar(payload)}::jsonb, 10); insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('treatment-decisions', ${dollar(decisionPayload)}::jsonb, 10);`);
+    await runPsql(`insert into ${dqIdent(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('treatment-confirmations', ${dollar(payload)}::jsonb, 10);`);
     let mailRes = { ok:false, skipped:true };
     const recipients = (cfg && cfg.email_recipients) || b.emailRecipients || '';
     const shouldSend = (cfg && cfg.email_on_finish) || b.emailOnFinish;
@@ -393,97 +1005,192 @@ async function handleTreatmentConfirmApi(req, res, url) {
   }
 }
 
-async function handleTreatmentDecisionApi(req,res,url){
- if(url.pathname!=='/api/treatment/decision')return false;
- if(req.method!=='POST'){send(res,405,'Method not allowed');return true}
- try{
-  const b=await readJson(req);
-  const allowed=['Refuzat','Omis','Amânat'];
-  const decision=allowed.includes(String(b.decision||''))?String(b.decision):'';
-  if(!decision){send(res,400,JSON.stringify({ok:false,error:'Decizie invalidă.'}),'application/json; charset=utf-8');return true}
-  const payload=JSON.stringify({
-   Senior:String(b.entityName||'').slice(0,160),Tratament:String(b.title||'Tratament').slice(0,240),
-   'Ora planificată':String(b.startTime||'').slice(0,20),Decizie:decision,Motiv:String(b.reason||'').slice(0,1000),
-   'Înregistrat la':new Date().toISOString(),OccurrenceKey:String(b.occurrenceKey||'').slice(0,300),'ID tratament':String(b.treatmentId||'').slice(0,40)
-  });
-  await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('treatment-decisions', ${dollar(payload)}::jsonb, 10);`);
-  send(res,200,'{"ok":true}','application/json; charset=utf-8');return true;
- }catch(e){send(res,500,JSON.stringify({ok:false,error:e.message||'Database error'}),'application/json; charset=utf-8');return true}
+async function handleAgendaApi(req, res, url) {
+  if (url.pathname !== '/api/agenda') return false;
+  const table = dqIdent(PGSCHEMA) + '.calendar_series';
+  try {
+    if (req.method === 'GET') {
+      const sql = `select coalesce(json_agg(row_to_json(t))::text,'[]') from (
+        select cs.id, cs.section_key, cs.task_type, cs.title, cs.description,
+          cs.start_date, cs.end_date, cs.start_time, cs.recurrence_rule,
+          cs.repeat_every_days, cs.active_weekdays, cs.escalation_minutes,
+          cs.status,
+          e.entity_code,
+          coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as entity_name,
+          br.branch_code, br.name as branch_name
+        from ${table} cs
+        left join ${dqIdent(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id
+        left join ${dqIdent(PGSCHEMA)}.care_branch br on br.id=cs.care_branch_id
+        where cs.section_key='agenda'
+        order by cs.start_time nulls last, cs.id desc
+      ) t;`;
+      const out = await runPsql(sql);
+      send(res, 200, out || '[]', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'POST') {
+      const b = await readJson(req);
+      const title = b.title || 'Activitate';
+      const desc = b.description || '';
+      const startDate = b.startDate || new Date().toISOString().slice(0,10);
+      const endDate = b.endDate || startDate;
+      const startTime = b.startTime || '09:00';
+      const recurrence = b.recurrenceRule || 'selected_weekdays';
+      const repeatDays = Number(b.repeatEveryDays || 0) || 1;
+      const weekdays = b.activeWeekdays || '';
+      const entityCodes = Array.isArray(b.entityCodes) && b.entityCodes.length ? b.entityCodes : [b.entityCode || 'ME-0001'];
+      const entityList = entityCodes.map(x => dollar(x)).join(',');
+      const sql = `
+        with src as (
+          select e.care_header_id as header_id, e.care_branch_id as branch_id, e.id as entity_id
+          from ${dqIdent(PGSCHEMA)}.managed_entity e
+          where e.entity_code in (${entityList})
+        ), ins as (
+          insert into ${table}(care_header_id, care_branch_id, entity_id, section_key, task_type, title, description, start_date, end_date, start_time, recurrence_rule, repeat_every_days, active_weekdays, escalation_minutes)
+          select header_id, branch_id, entity_id, 'agenda', 'agenda', ${dollar(title)}, ${dollar(desc)}, ${dollar(startDate)}::date, ${dollar(endDate)}::date, ${dollar(startTime)}::time, ${dollar(recurrence)}, ${repeatDays}, ${dollar(weekdays)}, 30
+          from src
+          returning id
+        ), cnt as (select count(*)::int as inserted from ins)
+        select case when (select inserted from cnt) > 0 then json_build_object('ok',true,'inserted',(select inserted from cnt))::text
+        else json_build_object('ok',false,'error','Nu am găsit seniorii selectați în baza de date.')::text end;`;
+      const out = await runPsql(sql);
+      let parsed=null; try{parsed=JSON.parse(out)}catch(_){}
+      if (!out || (parsed && parsed.ok === false)) { send(res, 400, parsed && parsed.error ? parsed.error : 'Activitatea nu a fost inserată.'); return true; }
+      send(res, 200, out, 'application/json; charset=utf-8');
+      return true;
+    }
+    send(res, 405, 'Method not allowed'); return true;
+  } catch(e) { send(res, 500, e.message || 'Database error'); return true; }
 }
 
-async function handleBeneficiaryFeedbackApi(req,res,url){
- if(url.pathname!=='/api/senior/feedback')return false;
- if(req.method!=='POST'){send(res,405,'Method not allowed');return true}
- try{
-  const b=await readJson(req);
-  const type=String(b.type||'').toLowerCase();
-  if(!['complaint','satisfaction','rights'].includes(type)){send(res,400,JSON.stringify({ok:false,error:'Tip invalid.'}),'application/json; charset=utf-8');return true}
-  const score=type==='satisfaction'?Math.max(1,Math.min(5,Number(b.score)||0)):'';
-  if(type==='satisfaction'&&!score){send(res,400,JSON.stringify({ok:false,error:'Alege un scor între 1 și 5.'}),'application/json; charset=utf-8');return true}
-  const anonymous=Boolean(b.anonymous);
-  const labels={complaint:'Sesizare / reclamație',satisfaction:'Satisfacție',rights:'Cerere privind drepturile'};
-  const payload=JSON.stringify({
-   Tip:labels[type],Categorie:String(b.category||'General').slice(0,120),Beneficiar:anonymous?'':String(b.entityName||'').slice(0,160),
-   'Cod entitate':anonymous?'':String(b.entityCode||'').slice(0,80),Anonim:anonymous?'Da':'Nu',Mesaj:String(b.message||'').slice(0,2000),
-   Scor:score,Data:new Date().toISOString(),Status:'Nou',Sursă:'FamilyCare Senior'
-  });
-  await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('beneficiary-feedback', ${dollar(payload)}::jsonb, 10);`);
-  send(res,200,'{"ok":true}','application/json; charset=utf-8');return true;
- }catch(e){send(res,500,JSON.stringify({ok:false,error:e.message||'Database error'}),'application/json; charset=utf-8');return true}
+
+async function handleApi(req, res, url) {
+  const parts = url.pathname.split('/').filter(Boolean); // api config section id
+  if (parts[0] !== 'api' || parts[1] !== 'config') return false;
+  const section = parts[2];
+  const id = parts[3];
+  if (!sectionOk(section)) { send(res, 400, 'Invalid section'); return true; }
+  if (section === 'mail-settings') { send(res, 403, 'Folosește endpointul securizat /api/mail-settings.'); return true; }
+  if (await handleDirectConfigApi(req, res, section, id)) return true;
+  const table = dqIdent(PGSCHEMA) + '.config_record';
+  try {
+    if (req.method === 'GET' && !id) {
+      const sql = `select coalesce(json_agg(row_to_json(t))::text,'[]') from (select id, section_key, payload, sort_order from ${table} where section_key=${dollar(section)} order by sort_order, id) t;`;
+      const out = await runPsql(sql);
+      send(res, 200, out || '[]', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'POST' && !id) {
+      const body = await readJson(req);
+      const sql = `insert into ${table}(section_key,payload,sort_order) values (${dollar(section)}, ${dollar(JSON.stringify(body))}::jsonb, 100) returning json_build_object('ok',true,'id',id)::text;`;
+      const out = await runPsql(sql);
+      send(res, 200, out || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'PUT' && idOk(id)) {
+      const body = await readJson(req);
+      const sql = `update ${table} set payload=${dollar(JSON.stringify(body))}::jsonb, updated_at=now() where id=${Number(id)} and section_key=${dollar(section)} returning json_build_object('ok',true,'id',id)::text;`;
+      const out = await runPsql(sql);
+      send(res, 200, out || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    if (req.method === 'DELETE' && idOk(id)) {
+      const sql = `delete from ${table} where id=${Number(id)} and section_key=${dollar(section)}; select json_build_object('ok',true)::text;`;
+      const out = await runPsql(sql);
+      send(res, 200, out.split('\n').pop() || '{"ok":true}', 'application/json; charset=utf-8');
+      return true;
+    }
+    send(res, 405, 'Method not allowed');
+    return true;
+  } catch (e) {
+    send(res, 500, e.message || 'Database error');
+    return true;
+  }
 }
 
-async function handleApi(req,res,url){
- try{
-  if(url.pathname==='/api/senior/entities'){
-   const branchCode=url.searchParams.get('branchCode')||'CB-0001';
-   const entityFilter=SENIOR_ENTITY_CODE?` and e.entity_code=${dollar(SENIOR_ENTITY_CODE)}`:'';
-   const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (
-     select
-       e.entity_code,
-       coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as name,
-       e.entity_type,
-       coalesce(b.name, to_jsonb(e)->>'branch_name') as branch_name,
-       b.branch_code,
-       coalesce(to_jsonb(e)->>'address_details', e.address_notes, e.access_details, concat_ws(', ', to_jsonb(e)->>'country', to_jsonb(e)->>'city', to_jsonb(e)->>'street', to_jsonb(e)->>'street_no')) as address_details,
-       coalesce(to_jsonb(e)->>'responsible_name', e.notes, '') as responsible_name,
-       coalesce(card_style.card_color,'') as card_color,
-       coalesce(card_style.card_text_color,'') as card_text_color
-     from ${dq(PGSCHEMA)}.managed_entity e
-     left join ${dq(PGSCHEMA)}.care_branch b on b.id=e.care_branch_id
-     left join lateral (
-       select
-         c.payload->>'Culoare fundal' as card_color,
-         c.payload->>'Culoare text' as card_text_color
-       from ${dq(PGSCHEMA)}.config_record c
-       where c.section_key='senior-card-colors'
-         and coalesce(c.payload->>'Cod entitate','')=e.entity_code
-       order by c.id desc
-       limit 1
-     ) card_style on true
-     where coalesce(e.active,true)=true and coalesce(e.allows_senior_screen,true)=true and (coalesce(b.branch_code,'')=${dollar(branchCode)} or coalesce(to_jsonb(e)->>'branch_name','') in (select name from ${dq(PGSCHEMA)}.care_branch where branch_code=${dollar(branchCode)}))${entityFilter}
-     order by coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code)
-   ) t;`;
-   const out=await runPsql(sql); send(res,200,out||'[]','application/json; charset=utf-8'); return true;
+const requestHandler = async (req, res) => {
+  res.familyCareSeniorFrameSources = seniorFrameSourcesFor(req);
+  res.familyCareSecureRequest = requestIsSecure(req);
+  const url = new URL(req.url, 'http://127.0.0.1');
+  if (await handleMainAuthApi(req, res, url)) return;
+  if (url.pathname === '/api/runtime-config') {
+    send(res, 200, JSON.stringify({ ok:true, version:'1.0.70', seniorBaseUrl:SENIOR_BASE_URL, authRequired:AUTH_REQUIRED, authenticated:authorizedMain(req) }), 'application/json; charset=utf-8');
+    return;
   }
-  if(url.pathname==='/api/treatment'){
-   const entityFilter=SENIOR_ENTITY_CODE?` and e.entity_code=${dollar(SENIOR_ENTITY_CODE)}`:'';
-   const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (select cs.id, cs.section_key, cs.task_type, cs.title, cs.description, cs.start_date, cs.end_date, cs.start_time, cs.recurrence_rule, cs.repeat_every_days, cs.active_weekdays, cs.escalation_minutes, cs.email_on_create, cs.email_on_finish, cs.email_recipients, cs.status, e.entity_code, coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as entity_name, br.branch_code, br.name as branch_name from ${dq(PGSCHEMA)}.calendar_series cs left join ${dq(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id left join ${dq(PGSCHEMA)}.care_branch br on br.id=cs.care_branch_id where cs.section_key='treatment' and coalesce(cs.active,true)=true and lower(coalesce(cs.status,'active')) not in ('cancelled','canceled','anulat','anulată','anulata')${entityFilter} order by cs.start_time nulls last, cs.id desc) t;`;
-   const out=await runPsql(sql); send(res,200,out||'[]','application/json; charset=utf-8'); return true;
+  if (url.pathname.startsWith('/api/') && !authorizedMain(req)) {
+    send(res, 401, JSON.stringify({ ok:false, error:'Autentificare necesară.' }), 'application/json; charset=utf-8');
+    return;
   }
- }catch(e){send(res,500,e.message||'Database error'); return true}
- return false;
-}
-const requestHandler=async(req,res)=>{res.familyCareFrameAncestors=frameAncestorsFor(req);res.familyCareSecureRequest=requestIsSecure(req);const url=new URL(req.url,'http://127.0.0.1');
-  if(url.pathname.startsWith('/api/')&&!['GET','HEAD','OPTIONS'].includes(req.method)&&!originAllowed(req)){send(res,403,'Origin not allowed');return}
-  if(await handleSeniorLoginApi(req,res,url))return;
-  if(url.pathname.startsWith('/api/')&&!authorizedSenior(req)){send(res,401,JSON.stringify({ok:false,error:'Sesiune expirată'}),'application/json; charset=utf-8');return}
-  if(await handleSeniorSoundSettingsApi(req,res,url)) return;
-  if(await handleFamilyContactApi(req,res,url)) return;
-  if(await handleTreatmentConfirmApi(req,res,url)) return; if(await handleTreatmentDecisionApi(req,res,url)) return; if(await handleBeneficiaryFeedbackApi(req,res,url)) return; if(await handleQuickActionApi(req,res,url)) return; if(await handleApi(req,res,url)) return;
-  let pathname=decodeURIComponent(url.pathname); if(pathname==='/') pathname=SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'; if (/\.(md|sql|txt|log|env|ya?ml)$/i.test(pathname) || pathname.includes('/tests/')) { send(res,404,'Not found'); return; } const file=path.resolve(ROOT,pathname.replace(/^[/\\]+/,'')); const relative=path.relative(ROOT,file); if(relative.startsWith('..')||path.isAbsolute(relative)){send(res,403,'Forbidden'); return} fs.readFile(file,(err,data)=>{if(err){send(res,404,'Not found');return} send(res,200,data,MIME[path.extname(file).toLowerCase()]||'application/octet-stream')})
+  if (url.pathname.startsWith('/api/') && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && !originAllowed(req)) {
+    send(res, 403, 'Origin not allowed');
+    return;
+  }
+  if (await handleMailSettingsApi(req, res, url)) return;
+  if (await handleSeniorSoundSettingsApi(req, res, url)) return;
+  if (await handleFamilyContactApi(req, res, url)) return;
+  if (await handleTreatmentConfirmApi(req, res, url)) return;
+  if (await handleQuickActionApi(req, res, url)) return;
+  if (await handleSeniorEntitiesApi(req, res, url)) return;
+  if (await handleTreatmentApi(req, res, url)) return;
+  if (await handleAgendaApi(req, res, url)) return;
+  if (await handleApi(req, res, url)) return;
+  let pathname = decodeURIComponent(url.pathname);
+  // Render/public root fix: redirect root to the real page path so relative links
+  // like journal.html and config.html resolve as /pages/journal.html and /pages/config.html.
+  if (pathname === '/') {
+    send(res, 302, '', 'text/plain; charset=utf-8', {
+      'Location': authorizedMain(req) ? '/pages/dashboard.html' : '/pages/main-login.html',
+      'Cache-Control': 'no-store'
+    });
+    return;
+  }
+  if (/\.(md|sql|txt|log|env|ya?ml)$/i.test(pathname) || pathname.includes('/tests/')) { send(res, 404, 'Not found'); return; }
+  const publicStatic = pathname === '/pages/main-login.html' || pathname === '/offline.html' || pathname === '/manifest.webmanifest' || pathname === '/service-worker.js' || pathname === '/app-universal.js' || pathname.startsWith('/assets/') || pathname.startsWith('/styles/');
+  if (AUTH_REQUIRED && !authorizedMain(req) && !publicStatic) {
+    send(res, 302, '', 'text/plain; charset=utf-8', { 'Location':'/pages/main-login.html', 'Cache-Control':'no-store' });
+    return;
+  }
+  const file = path.resolve(ROOT, pathname.replace(/^[/\\]+/, ''));
+  const relative = path.relative(ROOT, file);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) { send(res, 403, 'Forbidden'); return; }
+  fs.readFile(file, (err, data) => {
+    if (err) { send(res, 404, 'Not found'); return; }
+    send(res, 200, data, MIME[path.extname(file).toLowerCase()] || 'application/octet-stream');
+  });
 };
+
 let server;
-if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
-server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
-const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.70 Test No Auth Layout Fix is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+if (HTTPS_ENABLED) {
+  if (!fs.existsSync(TLS_PFX_PATH)) {
+    console.error('ERROR: HTTPS este activ, dar certificatul lipsește: ' + TLS_PFX_PATH);
+    process.exit(1);
+  }
+  server = https.createServer({ pfx: fs.readFileSync(TLS_PFX_PATH), passphrase: TLS_PFX_PASSPHRASE }, requestHandler);
+} else {
+  server = http.createServer(requestHandler);
+}
+
+server.on('error', err => {
+  if (err && err.code === 'EADDRINUSE') console.error('ERROR: Portul ' + PORT + ' este deja folosit. Oprește instanța existentă sau schimbă PORT.');
+  else console.error('ERROR server:', err && err.message ? err.message : err);
+  process.exitCode = 1;
+});
+const PID_FILE = path.join(ROOT, '.familycare-main.pid');
+try { fs.writeFileSync(PID_FILE, String(process.pid), 'utf8'); } catch (_) {}
+function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}
+process.on('exit', removePidFile);
+function shutdown(){server.close(() => process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(() => process.exit(0),1500).unref();}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
+
+server.listen(PORT, HOST, () => {
+  console.log('============================================================');
+  console.log('FamilyCare Main V1.0.70 Connected Test No Auth is running');
+  console.log('URL: ' + PROTOCOL + '://localhost:' + PORT + (AUTH_REQUIRED ? '/pages/main-login.html' : '/pages/dashboard.html'));
+  console.log('Main authentication: ' + (AUTH_REQUIRED ? 'required' : 'disabled for testing'));
+  console.log('Database: ' + (process.env.PGDATABASE || '(from PostgreSQL defaults)') + ' / schema ' + PGSCHEMA);
+  console.log('DB mode: ' + (process.env.DATABASE_URL ? 'DATABASE_URL / pg' : 'local psql'));
+  if (SENIOR_BASE_URL) console.log('Senior URL: ' + SENIOR_BASE_URL);
+  console.log('Press CTRL+C in this window to stop the server.');
+  console.log('============================================================');
+});
