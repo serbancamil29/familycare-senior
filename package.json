@@ -1,0 +1,14 @@
+{
+  "name": "familycare-senior-render",
+  "version": "1.0.62",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
