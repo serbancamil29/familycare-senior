@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.64</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.65</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="logoutBtn" type="button">Ieșire</button>
      <button id="themeBtn" type="button">Dark</button>
@@ -210,7 +210,7 @@ function renderTreatments(){
  const selected=allEntities.find(e=>e.entity_code===selectedEntityCode);
  const titleEl=document.getElementById('nextTitle');
  const selectedDayName=dayName(selectedDay);
- if(titleEl) titleEl.textContent=selected?`Program ${selectedDayName} · ${selected.name}`:`Program ${selectedDayName}`;
+ if(titleEl) titleEl.textContent='Program';
  const items=treatmentItemsForEntityDay(selectedEntityCode,selectedDay);
  const wrap=document.getElementById('nextTreatments');
  wrap.innerHTML=items.length?items.slice(0,6).map(t=>`<button type="button" class="kiosk-treatment ${severityClass(t.diff)}" data-id="${safe(t.id)}" data-key="${safe(t.occurrence_key)}" title="${safe(t.title)}"><span class="program-line"><b>${timeText(t.start_time)}</b><i aria-hidden="true">-</i><strong>${safe(t.title)}</strong></span></button>`).join(''):`<div class="kiosk-empty">Fără taskuri azi</div>`;
@@ -342,7 +342,8 @@ function openContactAction(action){
  document.getElementById('dialNumber').value=first;
  choices.querySelectorAll('.contact-choice').forEach(btn=>btn.onclick=()=>{choices.querySelectorAll('.contact-choice').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); document.getElementById('dialNumber').value=btn.dataset.phone||'';});
  modal.classList.add('show'); modal.setAttribute('aria-hidden','false');
- if(needsMessage && messageText) setTimeout(()=>messageText.focus(),120);
+ // Nu focalizăm automat mesajul pe telefon, ca să nu sară tastatura peste modal.
+ if(false && needsMessage && messageText) setTimeout(()=>messageText.focus(),120);
 }
 function closeContactAction(){const modal=document.getElementById('contactActionModal'); modal.classList.remove('show'); modal.setAttribute('aria-hidden','true');}
 function runContactAction(){

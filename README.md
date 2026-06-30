@@ -1,4 +1,4 @@
-# FamilyCare Senior V1.0.64 Render
+# FamilyCare Senior V1.0.65 Render
 
 ## Render Web Service
 - Build Command: `npm install`
@@ -21,7 +21,7 @@ După deploy, deschizi URL-ul Senior pe telefon și alegi `Install app` / `Add t
 
 ---
 
-# FamilyCare Senior V1.0.64 Universal PWA
+# FamilyCare Senior V1.0.65 Universal PWA
 
 Aceeași aplicație Senior este adaptată pentru desktop, laptop, tabletă și telefon, inclusiv Realme și Samsung.
 
@@ -31,7 +31,7 @@ Aceeași aplicație Senior este adaptată pentru desktop, laptop, tabletă și t
 - PC + telefoane/tablete în aceeași rețea Wi-Fi: rulează `START_FAMILYCARE_SENIOR_NETWORK.bat`.
 - Instrucțiuni Android și instalare PWA: `MOBILE_TABLET_SETUP.md`.
 
-## Ce aduce V1.0.64
+## Ce aduce V1.0.65
 
 - Culoarea configurată pentru senior este folosită atât la selectorul de sus, cât și la cardul mare de confirmare.
 - Layout unificat pe containere; rândurile, minicardurile și textele se adaptează la lățimea și înălțimea ferestrei.
@@ -53,3 +53,7 @@ Aceeași aplicație Senior este adaptată pentru desktop, laptop, tabletă și t
 Modul Network este pentru o rețea Wi-Fi privată. Nu publica portul 31001 direct pe internet.
 
 Vezi `RESPONSIVE_TEST_MATRIX.md` pentru dimensiunile verificate și pașii de test pe dispozitiv fizic.
+
+
+## V1.0.65
+Mobile senior layout refinement: header alignment, bigger app name, wider sound controls, simplified Program title, smaller confirmation cards, centered bottom action cards.
