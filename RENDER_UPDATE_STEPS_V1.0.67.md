@@ -1,4 +1,4 @@
-# FamilyCare Senior V1.0.67 - UI cleanup
+# FamilyCare Senior V1.0.68 - UI cleanup
 
 ## What changed
 - Senior screen: removed logout, sound type and volume controls from the phone UI.

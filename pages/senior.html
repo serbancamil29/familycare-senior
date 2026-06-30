@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.67</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.68</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -219,7 +219,7 @@ function renderConfirmZones(){
   const confirmable=first&&canConfirmOccurrence(first);
    const zoneBackground=validCardColor(e.card_color,CARD_PALETTE[entityIndex%CARD_PALETTE.length]);
    const zoneText=validCardColor(e.card_text_color,'#FFFFFF');
-   return `<div class="confirm-zone ${state} ${active?'selected-senior':''} ${isNearest?'nearest-alert':''} ${critical?'nearest-critical':''} ${confirmable?'confirmable':'locked-confirm'}" data-entity="${safe(e.entity_code)}" data-key="${safe(first?first.occurrence_key:'')}" style="--confirm-zone-bg:${zoneBackground};--confirm-zone-text:${zoneText}"><div class="confirm-zone-name">${safe(e.name)}</div><div class="confirm-treatment-list">${list}</div></div>`;
+   return `<div class="confirm-zone ${state} ${active?'selected-senior':''} ${isNearest?'nearest-alert':''} ${critical?'nearest-critical':''} ${confirmable?'confirmable':'locked-confirm'}" data-entity="${safe(e.entity_code)}" data-key="${safe(first?first.occurrence_key:'')}" style="--confirm-zone-bg:${zoneBackground};--confirm-zone-text:${zoneText}"><div class="confirm-treatment-list">${list}</div></div>`;
  }).join('');
  box.innerHTML=zones;
  focusConfirmZone(selectedEntityCode);
