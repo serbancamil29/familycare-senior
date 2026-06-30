@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Login senior - FamilyCare Senior</title>
+ <link rel="stylesheet" href="../styles/common.css">
+ <link rel="stylesheet" href="../styles/senior-kiosk.css">
+</head>
+<body class="senior-login-body">
+ <main class="login-screen">
+  <section class="login-card">
+   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>by Cademix · v1.0.64</span></div></div>
+   <h1>Acces ramură</h1>
+   <form id="seniorLoginForm" class="login-form">
+    <label>Ramură<select id="branchCode"><option value="CB-0001">Părinții mei</option><option value="CB-0002">Familia mea</option><option value="CB-0003">Părinții soției</option><option value="CB-0006">Cămin seniori</option></select></label>
+    <label>PIN comun<input id="branchPin" type="password" inputmode="numeric" autocomplete="current-password" required></label>
+    <p id="loginError" class="login-error" role="alert" hidden></p>
+    <button class="kiosk-primary" type="submit">Intră</button>
+   </form>
+  </section>
+ </main>
+ <script>
+(function(){
+ const KEY='familycare-senior-session';
+ document.getElementById('seniorLoginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const error=document.getElementById('loginError');
+  const button=e.currentTarget.querySelector('button[type="submit"]');
+  error.hidden=true; button.disabled=true;
+  let auth;
+  try {
+   const response=await fetch('/api/senior/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:document.getElementById('branchPin').value})});
+   auth=await response.json();
+   if(!response.ok) throw new Error(auth.error||'PIN incorect');
+  } catch(err) {
+   error.textContent=err.message||'Autentificarea nu a reușit.'; error.hidden=false; button.disabled=false; return;
+  }
+  const branchSel=document.getElementById('branchCode');
+  const data={headerCode:'CH-RO-0001', branchCode:branchSel.value, branchName:branchSel.options[branchSel.selectedIndex].text, token:auth.token, expiresAt:Date.now()+auth.expiresIn, ts:Date.now()};
+  localStorage.setItem(KEY, JSON.stringify(data));
+  window.location.href='senior.html';
+ });
+})();
+ </script>
+</body>
+</html>
