@@ -1,4 +1,4 @@
-# Matrice responsive FamilyCare Senior V1.0.62
+# Matrice responsive FamilyCare Senior V1.0.64
 
 Aplicația Senior folosește aceeași bază de cod pe telefon, tabletă, laptop și desktop. Ecranul se compactează după lățimea și înălțimea disponibilă.
 

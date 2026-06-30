@@ -1,4 +1,4 @@
--- FamilyCare V1.0.62 FULL RESET schema + demo data
+-- FamilyCare V1.0.64 FULL RESET schema + demo data
 -- Database: Render PostgreSQL or local Caremyla
 -- Schema created: familycare
 -- WARNING: This script deletes everything from schema familycare and recreates it from zero.

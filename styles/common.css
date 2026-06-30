@@ -397,7 +397,7 @@ html.dark-theme .upcoming-tag.urgent span { color: #FEE2E2; }
 /* V1.0.56 phone actions */
 a.kiosk-action { text-decoration:none; }
 
-/* V1.0.62 Universal PWA */
+/* V1.0.64 Universal PWA */
 html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 body { overscroll-behavior-y:none; }
 .pwa-install-button { position:fixed; right:max(18px, env(safe-area-inset-right)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:5000; min-height:52px; border:0; border-radius:999px; padding:14px 20px; background:#2563EB; color:#fff; font:800 15px/1.2 Inter,Segoe UI,Arial,sans-serif; box-shadow:0 14px 30px rgba(37,99,235,.32); cursor:pointer; }
