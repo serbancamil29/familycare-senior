@@ -1,2 +1,0 @@
-/* Page-specific stylesheet. Shared visual system is in common.css. */
-.mail-item{border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--surface);margin-bottom:12px}.mail-meta{font-size:12px;color:var(--muted);font-weight:800}.suggestion{border-left:4px solid var(--primary);padding-left:14px;margin-top:12px}
