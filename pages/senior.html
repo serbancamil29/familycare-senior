@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.78</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.80</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -396,16 +396,19 @@ function openContactAction(action){
  // Nu focalizăm automat câmpurile, ca să nu apară tastatura peste modal fără acțiunea utilizatorului.
 }
 function closeContactAction(){const modal=document.getElementById('contactActionModal'); modal.classList.remove('show'); modal.setAttribute('aria-hidden','true');}
-function runContactAction(){
+async function runContactAction(){
  const phone=cleanPhone(document.getElementById('dialNumber').value);
  if(!phone){toast('Alege sau introdu un număr.');return;}
  const action=pendingContactAction;
  const bodyEl=document.getElementById('messageText');
  const msg=(bodyEl&&bodyEl.value.trim())?bodyEl.value.trim():defaultBody(action);
- logQuickAction(action, actionLabel(action)+' · '+phone+(action==='call'?'':' · '+msg));
- if(action==='call') location.href='tel:'+phone;
- else location.href='sms:'+phone+'?&body='+encodeURIComponent(msg);
- toast(action==='help'?'Alertă pregătită.':'Acțiune pregătită.');
+ await logQuickAction(action, actionLabel(action)+' · '+phone+(action==='call'?'':' · '+msg));
+ if(action==='call'){
+  location.href='tel:'+phone;
+  toast('Se deschide apelul telefonic.');
+ } else {
+  toast(action==='help'?'Alerta a fost trimisă în aplicație.':'Mesajul a fost trimis în aplicație.');
+ }
  closeContactAction();
 }
 document.querySelectorAll('.kiosk-action[data-action]').forEach(btn=>btn.onclick=()=>openContactAction(btn.dataset.action));

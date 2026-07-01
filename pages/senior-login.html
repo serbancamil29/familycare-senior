@@ -9,66 +9,35 @@
  <link rel="stylesheet" href="../styles/common.css">
  <link rel="stylesheet" href="../styles/senior-kiosk.css">
  <style>
-  .login-mode-switch{display:grid;grid-template-columns:1fr 1fr;border:1px solid #d7e0ec;border-radius:16px;padding:5px;background:#f8fafc;margin:18px 0 0}
-  .login-mode-switch button{border:0;border-radius:12px;background:transparent;padding:13px 10px;font-weight:900;color:#10213d;cursor:pointer}
-  .login-mode-switch button.active{background:#2563eb;color:#fff;box-shadow:0 8px 18px rgba(37,99,235,.25)}
-  html.dark-theme .login-mode-switch{background:#0b0f19;border-color:#334155}html.dark-theme .login-mode-switch button{color:#f8fafc}
   .login-card small{display:block;margin-top:16px;color:#64748b;line-height:1.45;font-weight:750}.login-error{background:#fee2e2;color:#b91c1c;border-radius:14px;padding:12px;font-weight:900}
+  .login-note{margin-top:18px;padding:14px 16px;border:1px solid #d7e0ec;border-radius:16px;background:#f8fafc;color:#334155;font-weight:750;line-height:1.45}
+  html.dark-theme .login-note{background:#0b0f19;border-color:#334155;color:#cbd5e1}
  </style>
 </head>
 <body class="senior-login-body">
  <main class="login-screen">
-  <section class="login-card" data-mode="login">
-   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>Acces beneficiar conectat · v1.0.78</span></div></div>
-   <h1 id="loginTitle">Autentificare</h1>
-   <p id="loginLead" class="login-hint">Intră cu același utilizator creat în FamilyCare Main. Așa Senior afișează doar beneficiarii aparținătorului respectiv.</p>
-   <div class="login-mode-switch" role="tablist" aria-label="Mod autentificare">
-    <button type="button" class="active" id="loginTab" role="tab" aria-selected="true">Intră în cont</button>
-    <button type="button" id="registerTab" role="tab" aria-selected="false">Utilizator nou</button>
-   </div>
+  <section class="login-card">
+   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>Acces beneficiar conectat · v1.0.80</span></div></div>
+   <h1>Autentificare</h1>
+   <p class="login-hint">Intră doar cu un utilizator existent, creat în FamilyCare Main. Utilizatorii și beneficiarii se configurează din Main.</p>
    <form id="seniorLoginForm" class="login-form">
     <label>Telefon sau utilizator<input id="loginIdentifier" type="text" autocomplete="username" inputmode="text" required></label>
     <label>Parolă<input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></label>
     <p id="loginError" class="login-error" role="alert" hidden></p>
     <button class="kiosk-primary" type="submit">Intră în Senior</button>
    </form>
-   <form id="seniorRegisterForm" class="login-form" hidden>
-    <label>Utilizator<input id="regName" type="text" autocomplete="name" placeholder="Ex: Camil Popescu" required></label>
-    <label>Parolă<input id="regPassword" type="password" autocomplete="new-password" minlength="6" required></label>
-    <label>Telefon<input id="regPhone" type="tel" autocomplete="tel" inputmode="tel" placeholder="Ex: 07xxxxxxxx" required></label>
-    <label>Tip organizație<select id="regOrgType" required><option value="familie_proprie">Familie proprie</option><option value="familie_extinsa">Familie extinsă</option><option value="retea">Rețea / furnizor</option><option value="camin">Cămin / locație</option></select></label>
-    <p id="registerError" class="login-error" role="alert" hidden></p>
-    <button class="kiosk-primary" type="submit">Creează utilizator și intră</button>
-   </form>
-   <small>Beneficiarii se adaugă în Main, la Configurări → Beneficiari, pe organizația și grupul utilizatorului.</small>
+   <div class="login-note">Pentru utilizator nou: intră în Main → Configurări → Beneficiari și setează acolo Utilizator senior, Parolă senior și Telefon senior.</div>
   </section>
  </main>
  <script>
 (function(){
  const KEY='familycare-senior-session';
  const loginForm=document.getElementById('seniorLoginForm');
- const registerForm=document.getElementById('seniorRegisterForm');
- const loginTab=document.getElementById('loginTab');
- const registerTab=document.getElementById('registerTab');
  const loginError=document.getElementById('loginError');
- const registerError=document.getElementById('registerError');
- const title=document.getElementById('loginTitle');
- const lead=document.getElementById('loginLead');
- function setTab(tab){
-  const isRegister=tab==='register';
-  loginForm.hidden=isRegister; registerForm.hidden=!isRegister;
-  loginTab.classList.toggle('active',!isRegister); registerTab.classList.toggle('active',isRegister);
-  loginTab.setAttribute('aria-selected',String(!isRegister)); registerTab.setAttribute('aria-selected',String(isRegister));
-  title.textContent=isRegister?'Utilizator nou':'Autentificare';
-  lead.textContent=isRegister?'Creează aparținătorul. Apoi în Main poți adăuga beneficiari pe organizația lui.':'Intră cu același utilizator creat în FamilyCare Main. Așa Senior afișează doar beneficiarii aparținătorului respectiv.';
-  loginError.hidden=true; registerError.hidden=true;
-  setTimeout(()=>{const first=isRegister?document.getElementById('regName'):document.getElementById('loginIdentifier');first&&first.focus();},30);
- }
  function saveSession(data){
   const expires=Date.now()+Number(data.expiresIn||43200000);
   localStorage.setItem(KEY,JSON.stringify({headerCode:data.headerCode||'',headerName:data.headerName||'',userName:data.userName||'',entityCode:data.entityCode||'',singleEntity:!!data.singleEntity,expiresAt:expires,ts:Date.now()}));
  }
- loginTab.onclick=()=>setTab('login'); registerTab.onclick=()=>setTab('register');
  fetch('/api/senior/session',{cache:'no-store'}).then(r=>r.json()).then(s=>{if(s.authenticated||s.authRequired===false){saveSession(s);location.replace('senior.html');}}).catch(()=>{});
  loginForm.addEventListener('submit',async e=>{
   e.preventDefault(); loginError.hidden=true; const button=loginForm.querySelector('button[type="submit"]'); button.disabled=true;
@@ -78,15 +47,6 @@
    const result=await response.json().catch(()=>({})); if(!response.ok) throw new Error(result.error||'Autentificarea nu a reușit.');
    saveSession(result); location.replace('senior.html');
   }catch(err){loginError.textContent=err.message||'Autentificarea nu a reușit.'; loginError.hidden=false; button.disabled=false;}
- });
- registerForm.addEventListener('submit',async e=>{
-  e.preventDefault(); registerError.hidden=true; const button=registerForm.querySelector('button[type="submit"]'); button.disabled=true;
-  try{
-   const response=await fetch('/api/senior/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('regName').value,user:document.getElementById('regName').value,password:document.getElementById('regPassword').value,phone:document.getElementById('regPhone').value,orgType:document.getElementById('regOrgType').value})});
-   const result=await response.json().catch(()=>({})); if(!response.ok) throw new Error(result.error||'Contul nu a putut fi creat.');
-   saveSession(result); location.replace('senior.html');
-  }catch(err){registerError.textContent=err.message||'Contul nu a putut fi creat.'; registerError.hidden=false; button.disabled=false;}
-  finally{button.disabled=false;}
  });
 })();
  </script>
