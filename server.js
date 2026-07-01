@@ -182,7 +182,7 @@ const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
 const SENIOR_PIN = String(process.env.SENIOR_PIN || '');
 const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
-// V1.0.71: test mode requested by Camil. By default, Senior can be opened directly without PIN.
+// V1.0.72: test mode remains configurable; production can require the PIN through SENIOR_AUTH_DISABLED=false.
 // To re-enable PIN later, set FAMILYCARE_AUTH_DISABLED=false (or SENIOR_AUTH_DISABLED=false) and configure SENIOR_PIN with 6-12 digits.
 const SENIOR_AUTH_DISABLED = !['false','0','no','nu'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || 'true').trim().toLowerCase());
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -278,6 +278,20 @@ async function handleSeniorSoundSettingsApi(req,res,url){
  }catch(e){send(res,200,'{"type":"soft","volume":70,"active":"da"}','application/json; charset=utf-8');return true;}
 }
 
+async function getSeniorDisplayLimit(){
+ try{
+  const sql=`select coalesce((select case when coalesce(payload->>'Număr carduri vizibile','') ~ '^[0-9]+$' then least(100,greatest(1,(payload->>'Număr carduri vizibile')::int)) else 0 end from ${dq(PGSCHEMA)}.config_record where section_key='senior-display-settings' order by id desc limit 1),0);`;
+  return Math.max(0,Math.min(100,Number(await runPsql(sql))||0));
+ }catch(_){return 0}
+}
+async function handleSeniorDisplaySettingsApi(req,res,url){
+ if(url.pathname!=='/api/senior-display-settings')return false;
+ if(req.method!=='GET'){send(res,405,'Method not allowed');return true}
+ const maxVisible=await getSeniorDisplayLimit();
+ send(res,200,JSON.stringify({ok:true,maxVisible,mode:maxVisible?'fixed':'auto',maximumSupported:100}),'application/json; charset=utf-8');
+ return true;
+}
+
 async function handleFamilyContactApi(req,res,url) {
   if (url.pathname !== '/api/family-contact') return false;
   try {
@@ -306,18 +320,18 @@ async function handleFamilyContactApi(req,res,url) {
       'Mesaj ajutor', coalesce(payload->>'Mesaj ajutor', payload->>'Mesaj urgență', payload->>'Mesaj implicit', 'Am nevoie de ajutor. Te rog să mă contactezi urgent.'),
       'Contacte', jsonb_build_array(
         jsonb_build_object(
-          'Etichetă','Principal',
-          'Nume',coalesce(payload->>'Nume principal', payload->>'Nume', 'Contact principal'),
+          'Etichetă',coalesce(payload->>'Nume principal', payload->>'Nume', 'Familie 1'),
+          'Nume',coalesce(payload->>'Nume principal', payload->>'Nume', 'Familie 1'),
           'Telefon',coalesce(payload->>'Telefon principal', payload->>'Numar principal', payload->>'Număr principal', payload->>'Telefon implicit', payload->>'phone_primary', payload->>'Telefon', '0700000001')
         ),
         jsonb_build_object(
-          'Etichetă','Secundar',
-          'Nume',coalesce(payload->>'Nume secundar', 'Contact secundar'),
+          'Etichetă',coalesce(payload->>'Nume secundar', 'Familie 2'),
+          'Nume',coalesce(payload->>'Nume secundar', 'Familie 2'),
           'Telefon',coalesce(payload->>'Telefon secundar', payload->>'Numar secundar', payload->>'Număr secundar', payload->>'phone_secondary', '0700000002')
         ),
         jsonb_build_object(
-          'Etichetă','Al treilea',
-          'Nume',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Contact rezervă'),
+          'Etichetă',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Familie 3'),
+          'Nume',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Familie 3'),
           'Telefon',coalesce(payload->>'Telefon al treilea', payload->>'Telefon urgență', payload->>'Telefon urgenta', payload->>'Numar al treilea', payload->>'Număr al treilea', payload->>'phone_third', '0700000003')
         )
       )
@@ -331,9 +345,9 @@ async function handleFamilyContactApi(req,res,url) {
       'Mesaj SMS':'Te rog să mă contactezi.',
       'Mesaj ajutor':'Am nevoie de ajutor. Te rog să mă contactezi urgent.',
       Contacte:[
-        {'Etichetă':'Principal', Nume:'Contact principal', Telefon:'0700000001'},
-        {'Etichetă':'Secundar', Nume:'Contact secundar', Telefon:'0700000002'},
-        {'Etichetă':'Al treilea', Nume:'Contact rezervă', Telefon:'0700000003'}
+        {'Etichetă':'Familie 1', Nume:'Familie 1', Telefon:'0700000001'},
+        {'Etichetă':'Familie 2', Nume:'Familie 2', Telefon:'0700000002'},
+        {'Etichetă':'Familie 3', Nume:'Familie 3', Telefon:'0700000003'}
       ]
     }), 'application/json; charset=utf-8');
     return true;
@@ -437,6 +451,7 @@ async function handleApi(req,res,url){
   if(url.pathname==='/api/senior/entities'){
    const branchCode=url.searchParams.get('branchCode')||'CB-0001';
    const entityFilter=SENIOR_ENTITY_CODE?` and e.entity_code=${dollar(SENIOR_ENTITY_CODE)}`:'';
+   const displayLimit=await getSeniorDisplayLimit();
    const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (
      select
        e.entity_code,
@@ -462,6 +477,7 @@ async function handleApi(req,res,url){
      ) card_style on true
      where coalesce(e.active,true)=true and coalesce(e.allows_senior_screen,true)=true and (coalesce(b.branch_code,'')=${dollar(branchCode)} or coalesce(to_jsonb(e)->>'branch_name','') in (select name from ${dq(PGSCHEMA)}.care_branch where branch_code=${dollar(branchCode)}))${entityFilter}
      order by coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code)
+     limit ${displayLimit||100}
    ) t;`;
    const out=await runPsql(sql); send(res,200,out||'[]','application/json; charset=utf-8'); return true;
   }
@@ -478,6 +494,7 @@ const requestHandler=async(req,res)=>{res.familyCareFrameAncestors=frameAncestor
   if(await handleSeniorLoginApi(req,res,url))return;
   if(url.pathname.startsWith('/api/')&&!authorizedSenior(req)){send(res,401,JSON.stringify({ok:false,error:'Sesiune expirată'}),'application/json; charset=utf-8');return}
   if(await handleSeniorSoundSettingsApi(req,res,url)) return;
+  if(await handleSeniorDisplaySettingsApi(req,res,url)) return;
   if(await handleFamilyContactApi(req,res,url)) return;
   if(await handleTreatmentConfirmApi(req,res,url)) return; if(await handleTreatmentDecisionApi(req,res,url)) return; if(await handleBeneficiaryFeedbackApi(req,res,url)) return; if(await handleQuickActionApi(req,res,url)) return; if(await handleApi(req,res,url)) return;
   let pathname=decodeURIComponent(url.pathname); if(pathname==='/') pathname=SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'; if (/\.(md|sql|txt|log|env|ya?ml)$/i.test(pathname) || pathname.includes('/tests/')) { send(res,404,'Not found'); return; } const file=path.resolve(ROOT,pathname.replace(/^[/\\]+/,'')); const relative=path.relative(ROOT,file); if(relative.startsWith('..')||path.isAbsolute(relative)){send(res,403,'Forbidden'); return} fs.readFile(file,(err,data)=>{if(err){send(res,404,'Not found');return} send(res,200,data,MIME[path.extname(file).toLowerCase()]||'application/octet-stream')})
@@ -486,4 +503,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.71 Test No Auth Layout Fix is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.72 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});

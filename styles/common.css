@@ -403,3 +403,20 @@ body { overscroll-behavior-y:none; }
 .pwa-install-button { position:fixed; right:max(18px, env(safe-area-inset-right)); bottom:max(18px, env(safe-area-inset-bottom)); z-index:5000; min-height:52px; border:0; border-radius:999px; padding:14px 20px; background:#2563EB; color:#fff; font:800 15px/1.2 Inter,Segoe UI,Arial,sans-serif; box-shadow:0 14px 30px rgba(37,99,235,.32); cursor:pointer; }
 .pwa-install-button[hidden] { display:none; }
 html.pwa-standalone .pwa-install-button { display:none; }
+
+/* V1.0.72: install action next to the product name. */
+.kiosk-brand .pwa-install-button,.login-brand .pwa-install-button {
+  position:static;
+  flex:0 0 auto;
+  min-height:30px;
+  margin-left:8px;
+  padding:6px 10px;
+  border-radius:10px;
+  font-size:11px;
+  line-height:1;
+  box-shadow:none;
+  white-space:nowrap;
+}
+@media (max-width:480px){
+  .kiosk-brand .pwa-install-button,.login-brand .pwa-install-button{min-height:26px;margin-left:5px;padding:5px 7px;font-size:9px;border-radius:8px}
+}

@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.71</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.72</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -331,9 +331,9 @@ function contactList(){
  const fc=familyContact||{};
  const raw=(Array.isArray(fc.Contacte)?fc.Contacte:[]).map((c,i)=>({...c, _source:'raw', _order:i}));
  const built=[
-  {Etichetă:'Principal', Nume:fc['Nume principal']||fc.Nume||'Contact principal', Telefon:fc['Telefon principal']||fc.Telefon, Implicit:true},
-  {Etichetă:'Secundar', Nume:fc['Nume secundar']||'Contact secundar', Telefon:fc['Telefon secundar']},
-  {Etichetă:'Al treilea', Nume:fc['Nume al treilea']||'Contact rezervă', Telefon:fc['Telefon al treilea']||fc['Telefon urgență']}
+  {Etichetă:fc['Nume principal']||fc.Nume||'Familie 1', Nume:fc['Nume principal']||fc.Nume||'Familie 1', Telefon:fc['Telefon principal']||fc.Telefon, Implicit:true},
+  {Etichetă:fc['Nume secundar']||'Familie 2', Nume:fc['Nume secundar']||'Familie 2', Telefon:fc['Telefon secundar']},
+  {Etichetă:fc['Nume al treilea']||'Familie 3', Nume:fc['Nume al treilea']||'Familie 3', Telefon:fc['Telefon al treilea']||fc['Telefon urgență']}
  ];
  const merged=[...raw,...built].filter(c=>cleanPhone(c.Telefon));
  const seen=new Set();
@@ -372,7 +372,7 @@ function openContactAction(action){
  document.getElementById('contactActionMain').textContent=action==='call'?'Apelează':(action==='message'?'Trimite mesaj':'Trimite alertă');
  const instruction=document.getElementById('contactInstruction');
  if(instruction) instruction.textContent=action==='call'?'Selectează numărul pe care dorești să suni.':'Alege contactul și scrie mesajul.';
- choices.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="contact-choice ${i===0?'active':''}" data-phone="${safe(c.Telefon)}"><span class="choice-radio" aria-hidden="true"></span><span class="choice-main"><b>${safe(c.Etichetă||('Contact '+(i+1)))}</b><strong>${safe(c.Telefon)}</strong></span>${i===0?'<em>Implicit</em>':''}</button>`).join(''):'<div class="contact-missing">Nu există numere configurate.</div>';
+ choices.innerHTML=list.length?list.map((c,i)=>`<button type="button" class="contact-choice ${i===0?'active':''}" data-phone="${safe(c.Telefon)}"><span class="choice-radio" aria-hidden="true"></span><span class="choice-main"><b>${safe(c.Nume||c.Etichetă||('Familie '+(i+1)))}</b><strong>${safe(c.Telefon)}</strong></span></button>`).join(''):'<div class="contact-missing">Nu există numere configurate.</div>';
  const first=list[0]&&list[0].Telefon||'';
  if(dialInput) dialInput.value=first;
  choices.querySelectorAll('.contact-choice').forEach(btn=>btn.onclick=()=>{choices.querySelectorAll('.contact-choice').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); if(dialInput) dialInput.value=btn.dataset.phone||'';});

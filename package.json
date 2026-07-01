@@ -1,6 +1,6 @@
 {
   "name": "familycare-senior-render",
-  "version": "1.0.71",
+  "version": "1.0.72",
   "private": true,
   "scripts": {
     "start": "node server.js",
