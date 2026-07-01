@@ -181,7 +181,7 @@ const TLS_PFX_PATH = process.env.TLS_PFX_PATH || path.join(ROOT, 'certs', 'famil
 const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
 const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
-// V1.0.84: Senior folosește același login ca Main, ca să lege aparținătorul de beneficiarii lui.
+// V1.0.85: Senior folosește același login ca Main, ca să lege aparținătorul de beneficiarii lui.
 // Doar pentru demo se poate dezactiva cu SENIOR_AUTH_DISABLED=true sau FAMILYCARE_AUTH_DISABLED=true.
 const SENIOR_AUTH_DISABLED = ['true','1','yes','da'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || '').trim().toLowerCase());
 const SESSION_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.SESSION_TTL_MINUTES || 720) * 60 * 1000);
@@ -294,7 +294,7 @@ async function ensureSeniorUserScope(found){
    if(linked&&linked.entity_code){
     if(!linked.branch_code)throw new Error('Beneficiarul nu este alocat unei ramuri / locații. Configurează ramura în FamilyCare Main.');
     if(userId) await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload || jsonb_build_object('HeaderCode',${dollar(linked.header_code||'')},'ID organizație',${dollar(linked.header_code||'')},'Organizație / cont',${dollar(linked.header_name||'')},'Organizatie',${dollar(linked.header_name||'')},'BranchCode',${dollar(linked.branch_code||'')},'EntityCode',${dollar(linked.entity_code)},'Cod beneficiar',${dollar(linked.entity_code)},'Beneficiar',${dollar(linked.entity_name||'')},'Rol','ramura') where id=${userId};`);
-    return {userId,userName:name,headerId:Number(linked.header_id||0),headerCode:linked.header_code||'',headerName:linked.header_name||orgName,branchCode:linked.branch_code||'',entityCode:'',loginEntityCode:linked.entity_code,entityName:'',role:'ramura'};
+    return {userId,userName:name,headerId:Number(linked.header_id||0),headerCode:linked.header_code||'',headerName:linked.header_name||orgName,branchCode:'',entityCode:linked.entity_code,entityName:linked.entity_name||'',role:'beneficiar'};
    }
   }catch(_){ }
  }
@@ -302,7 +302,17 @@ async function ensureSeniorUserScope(found){
   try{
    const out=await runPsql(`select coalesce((select json_build_object('id',id,'header_code',header_code,'name',name)::text from ${dq(PGSCHEMA)}.care_header where coalesce(active,true)=true and header_code=${dollar(headerCode)} order by id limit 1),'{}');`);
    const h=JSON.parse(out||'{}');
-   if(h&&h.id){const branch=await resolveSeniorBranch(h.id,payload.BranchCode||payload['Grup / locație']||'');if(!branch)throw new Error('Contul nu are o ramură unică. Configurează BranchCode în Main pentru dispozitivul Senior.');if(userId)await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload||jsonb_build_object('BranchCode',${dollar(branch.branch_code)},'Grup / locație',${dollar(branch.name)},'Rol','ramura') where id=${userId};`);return {userId,userName:name,headerId:Number(h.id),headerCode:h.header_code,headerName:h.name||orgName,branchCode:branch.branch_code,entityCode:'',role:'ramura'};}
+   if(h&&h.id){
+      const role=String(payload.Rol||'apartinator').toLowerCase();
+      if(role==='ramura'){
+        const branch=await resolveSeniorBranch(h.id,payload.BranchCode||payload['Grup / locație']||'');
+        if(!branch)throw new Error('Contul nu are o ramură unică. Configurează BranchCode în Main pentru dispozitivul Senior.');
+        if(userId)await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload||jsonb_build_object('BranchCode',${dollar(branch.branch_code)},'Grup / locație',${dollar(branch.name)},'Rol','ramura') where id=${userId};`);
+        return {userId,userName:name,headerId:Number(h.id),headerCode:h.header_code,headerName:h.name||orgName,branchCode:branch.branch_code,entityCode:'',role:'ramura'};
+      }
+      if(userId)await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload||jsonb_build_object('HeaderCode',${dollar(h.header_code)},'ID organizație',${dollar(h.header_code)},'Organizație / cont',${dollar(h.name||orgName)},'Organizatie',${dollar(h.name||orgName)},'Rol','apartinator') where id=${userId};`);
+      return {userId,userName:name,headerId:Number(h.id),headerCode:h.header_code,headerName:h.name||orgName,branchCode:'',entityCode:'',role:'apartinator'};
+    }
   }catch(_){}
  }
  const desiredOrg=orgName || (String(payload['Tip organizație']||'').toLowerCase()==='retea' ? ('Rețeaua '+name) : ('Familia '+name));
@@ -313,10 +323,8 @@ async function ensureSeniorUserScope(found){
     order by case when name=${dollar(desiredOrg)} then 0 else 1 end, id limit 1),'{}');`);
   const h=JSON.parse(out||'{}');
   if(h&&h.id){
-    const branch=await resolveSeniorBranch(h.id,payload.BranchCode||payload['Grup / locație']||'');
-    if(!branch)throw new Error('Contul nu are o ramură unică. Configurează ramura în FamilyCare Main.');
-    await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload || jsonb_build_object('HeaderCode',${dollar(h.header_code)},'ID organizație',${dollar(h.header_code)},'Organizație / cont',${dollar(h.name||desiredOrg)},'Organizatie',${dollar(h.name||desiredOrg)},'BranchCode',${dollar(branch.branch_code)},'Grup / locație',${dollar(branch.name)},'Rol','ramura') where id=${userId};`);
-    return {userId,userName:name,headerId:Number(h.id),headerCode:h.header_code,headerName:h.name||desiredOrg,branchCode:branch.branch_code,entityCode:'',role:'ramura'};
+    await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload || jsonb_build_object('HeaderCode',${dollar(h.header_code)},'ID organizație',${dollar(h.header_code)},'Organizație / cont',${dollar(h.name||desiredOrg)},'Organizatie',${dollar(h.name||desiredOrg)},'Rol','apartinator') where id=${userId};`);
+    return {userId,userName:name,headerId:Number(h.id),headerCode:h.header_code,headerName:h.name||desiredOrg,branchCode:'',entityCode:'',role:'apartinator'};
   }
  }catch(_){}
  throw new Error('Contul nu este legat de o organizație și o ramură valabile. Corectează legătura din Main → Configurări → Beneficiari.');
@@ -435,7 +443,9 @@ async function handleFamilyContactApi(req,res,url) {
   try {
     const session=getSeniorSession(req)||{};
     const headerCode=String(session.headerCode||'').trim();
+    const requestedEntity=String(url.searchParams.get('entityCode')||session.entityCode||'').trim();
     const scope=headerCode?` and (payload->>'HeaderCode'=${dollar(headerCode)} or (coalesce(payload->>'HeaderCode','')='' and (select count(*) from ${dq(PGSCHEMA)}.care_header where coalesce(active,true)=true)=1))`:'';
+    const entityScope=requestedEntity?` and (coalesce(payload->>'EntityCode', payload->>'Cod entitate','')=${dollar(requestedEntity)} or coalesce(payload->>'EntityCode', payload->>'Cod entitate','')='')`:'';
     const sql = `with contact_source as (
       select payload, updated_at, id, section_key
       from ${dq(PGSCHEMA)}.config_record
@@ -445,8 +455,9 @@ async function handleFamilyContactApi(req,res,url) {
          or payload ? 'Numar principal'
          or payload ? 'Număr principal'
          or payload ? 'Telefon implicit'
-         or payload ? 'phone_primary')${scope}
+         or payload ? 'phone_primary')${scope}${entityScope}
       order by
+        case when ${dollar(requestedEntity)}<>'' and coalesce(payload->>'EntityCode', payload->>'Cod entitate','')=${dollar(requestedEntity)} then 0 else 1 end,
         case when payload ? 'Telefon principal' or payload ? 'Numar principal' or payload ? 'Număr principal' or payload ? 'Telefon implicit' or payload ? 'phone_primary' then 0 else 1 end,
         updated_at desc nulls last,
         id desc
@@ -463,17 +474,17 @@ async function handleFamilyContactApi(req,res,url) {
         jsonb_build_object(
           'Etichetă',coalesce(payload->>'Nume principal', payload->>'Nume', 'Familie 1'),
           'Nume',coalesce(payload->>'Nume principal', payload->>'Nume', 'Familie 1'),
-          'Telefon',coalesce(payload->>'Telefon principal', payload->>'Numar principal', payload->>'Număr principal', payload->>'Telefon implicit', payload->>'phone_primary', payload->>'Telefon', '0700000001')
+          'Telefon',coalesce(payload->>'Telefon principal', payload->>'Numar principal', payload->>'Număr principal', payload->>'Telefon implicit', payload->>'phone_primary', payload->>'Telefon', '')
         ),
         jsonb_build_object(
           'Etichetă',coalesce(payload->>'Nume secundar', 'Familie 2'),
           'Nume',coalesce(payload->>'Nume secundar', 'Familie 2'),
-          'Telefon',coalesce(payload->>'Telefon secundar', payload->>'Numar secundar', payload->>'Număr secundar', payload->>'phone_secondary', '0700000002')
+          'Telefon',coalesce(payload->>'Telefon secundar', payload->>'Numar secundar', payload->>'Număr secundar', payload->>'phone_secondary', '')
         ),
         jsonb_build_object(
           'Etichetă',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Familie 3'),
           'Nume',coalesce(payload->>'Nume al treilea', payload->>'Nume urgentă', payload->>'Nume urgență', 'Familie 3'),
-          'Telefon',coalesce(payload->>'Telefon al treilea', payload->>'Telefon urgență', payload->>'Telefon urgenta', payload->>'Numar al treilea', payload->>'Număr al treilea', payload->>'phone_third', '0700000003')
+          'Telefon',coalesce(payload->>'Telefon al treilea', payload->>'Telefon urgență', payload->>'Telefon urgenta', payload->>'Numar al treilea', payload->>'Număr al treilea', payload->>'phone_third', '')
         )
       )
     )::text from p;`;
@@ -486,9 +497,9 @@ async function handleFamilyContactApi(req,res,url) {
       'Mesaj SMS':'Te rog să mă contactezi.',
       'Mesaj ajutor':'Am nevoie de ajutor. Te rog să mă contactezi urgent.',
       Contacte:[
-        {'Etichetă':'Familie 1', Nume:'Familie 1', Telefon:'0700000001'},
-        {'Etichetă':'Familie 2', Nume:'Familie 2', Telefon:'0700000002'},
-        {'Etichetă':'Familie 3', Nume:'Familie 3', Telefon:'0700000003'}
+        {'Etichetă':'Familie 1', Nume:'Familie 1', Telefon:''},
+        {'Etichetă':'Familie 2', Nume:'Familie 2', Telefon:''},
+        {'Etichetă':'Familie 3', Nume:'Familie 3', Telefon:''}
       ]
     }), 'application/json; charset=utf-8');
     return true;
@@ -673,4 +684,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.84 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.85 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});

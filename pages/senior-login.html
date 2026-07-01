@@ -17,12 +17,12 @@
 <body class="senior-login-body">
  <main class="login-screen">
   <section class="login-card">
-   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>Acces ramură / locație · v1.0.84</span></div></div>
+   <div class="login-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare Senior</b><span>Acces ramură / locație · v1.0.85</span></div></div>
    <h1>Autentificare</h1>
    <p class="login-hint">Intră cu utilizatorul configurat în Main. Pe acest dispozitiv vor apărea toți beneficiarii din aceeași ramură / locație.</p>
-   <form id="seniorLoginForm" class="login-form">
-    <label>Telefon sau utilizator<input id="loginIdentifier" type="text" autocomplete="username" inputmode="text" required></label>
-    <label>Parolă<input id="loginPassword" type="password" autocomplete="current-password" minlength="6" required></label>
+   <form id="seniorLoginForm" class="login-form" autocomplete="off">
+    <label>Telefon sau utilizator<input id="loginIdentifier" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" inputmode="text" required></label>
+    <label>Parolă<input id="loginPassword" type="password" autocomplete="new-password" minlength="6" required></label>
     <p id="loginError" class="login-error" role="alert" hidden></p>
     <button class="kiosk-primary" type="submit">Intră în Senior</button>
    </form>
@@ -35,6 +35,12 @@
  try{localStorage.removeItem(KEY);}catch(_){}
  const loginForm=document.getElementById('seniorLoginForm');
  const loginError=document.getElementById('loginError');
+ function clearCredentialFields(){
+  ['loginIdentifier','loginPassword'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
+ }
+ clearCredentialFields();
+ window.addEventListener('pageshow', clearCredentialFields);
+ setTimeout(clearCredentialFields, 120);
  function saveSession(data){
   const expires=Date.now()+Number(data.expiresIn||43200000);
   localStorage.setItem(KEY,JSON.stringify({headerCode:data.headerCode||'',headerName:data.headerName||'',branchCode:data.branchCode||'',userName:data.userName||'',role:data.role||'',entityCode:data.entityCode||'',singleEntity:!!data.singleEntity,expiresAt:expires,ts:Date.now()}));
