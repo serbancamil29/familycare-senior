@@ -1,4 +1,4 @@
-/* FamilyCare senior standalone / kiosk screen - v1.0.56 */
+/* FamilyCare senior standalone / kiosk screen - v1.0.73 */
 .senior-kiosk-body,
 .senior-login-body {
   margin: 0;
@@ -338,7 +338,7 @@ html.dark-theme .clean-top-actions button {
 }
 
 
-/* v1.0.56 - confirmation cleanup, progressive alerts, clearer text, collapsible treatments */
+/* v1.0.73 - confirmation cleanup, progressive alerts, clearer text, collapsible treatments */
 .senior-kiosk-body { font-weight: 520; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 .kiosk-brand b,
 .senior-person-card b,
@@ -416,13 +416,13 @@ html.dark-theme .kiosk-treatment.state-overdue { background:#4C0B0B; border-colo
  .kiosk-page.treatments-collapsed .confirm-treatment-card { min-height:190px; }
 }
 
-/* v1.0.56 - clearer senior confirmation zones with top 3 treatments */
+/* v1.0.73 - clearer senior confirmation zones with top 3 treatments */
 .confirm-zone{justify-content:flex-start;position:relative;padding:clamp(14px,1.5vw,22px);gap:12px}.confirm-zone-name{position:sticky;top:0;align-self:flex-start;font-size:clamp(18px,1.7vw,26px);font-weight:780;letter-spacing:-.02em;color:#fff;line-height:1.05}.confirm-treatment-list{display:flex;flex-direction:column;gap:8px;min-width:0}.confirm-treatment-line{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:baseline;min-width:0}.confirm-treatment-line span{font-size:clamp(15px,1.4vw,20px);font-weight:820;color:rgba(255,255,255,.98)}.confirm-treatment-line strong{font-weight:820;color:#fff;line-height:1.02;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.confirm-treatment-line small{font-size:clamp(12px,1.1vw,16px);font-weight:760;color:rgba(255,255,255,.86);white-space:nowrap}.confirm-treatment-line.first strong{font-size:clamp(32px,3.2vw,58px);letter-spacing:-.045em;text-shadow:0 2px 5px rgba(0,0,0,.18)}.confirm-treatment-line.next strong{font-size:clamp(18px,1.7vw,28px);opacity:.96}.confirm-treatment-line.next span,.confirm-treatment-line.next small{opacity:.86}.confirm-treatment-line.empty-line{display:flex;flex-direction:column;gap:4px}.confirm-treatment-line.empty-line strong{font-size:clamp(24px,2.4vw,38px)}.kiosk-treatment span{font-size:clamp(17px,1.7vw,24px);font-weight:760}.kiosk-treatment b{font-size:clamp(20px,2vw,30px);font-weight:820}.kiosk-now{font-size:clamp(14px,1.4vw,19px)}
 @media(max-width:980px){.confirm-treatment-line.first strong{font-size:clamp(22px,3.4vw,36px)}.confirm-treatment-line{grid-template-columns:auto 1fr}.confirm-treatment-line small{grid-column:2/3}.confirm-treatment-line.next:nth-child(n+3){display:none}}
 @media(max-width:640px){.confirm-treatment-line.first strong{font-size:22px}.confirm-treatment-line.next{display:none}.confirm-zone-name{font-size:15px}}
 
 
-/* v1.0.56 - responsive containers + large contact/action modal */
+/* v1.0.73 - responsive containers + large contact/action modal */
 .senior-kiosk-body { overflow: auto; }
 .kiosk-page {
   min-height: 100vh;
@@ -992,7 +992,7 @@ html.dark-theme .confirm-zone {
 }
 
 
-/* v1.0.56 - responsive kiosk: keep all controls visible, no automatic collapse */
+/* v1.0.73 - responsive kiosk: keep all controls visible, no automatic collapse */
 .senior-kiosk-body {
   overflow: hidden !important;
 }
@@ -1537,7 +1537,7 @@ html.dark-theme .sound-top-actions .kiosk-now { color: #CBD5E1; }
   .kiosk-action small { display:none; }
 }
 
-/* v1.0.56 - final senior layout refinements */
+/* v1.0.73 - final senior layout refinements */
 .kiosk-page {
   max-width: 100vw;
 }
@@ -1699,7 +1699,7 @@ html.dark-theme .sound-top-actions .kiosk-now { color: #CBD5E1; }
   .confirm-treatment-line.next strong { font-size: 18px !important; }
 }
 
-/* v1.0.56 - kiosk responsive containment and alignment fix */
+/* v1.0.73 - kiosk responsive containment and alignment fix */
 .senior-kiosk-body { overflow: hidden !important; }
 .kiosk-page {
   box-sizing: border-box !important;
@@ -4755,3 +4755,8 @@ body.senior-kiosk-body { overscroll-behavior-x:none !important; }
     font-size: clamp(16px, 4.9vw, 24px) !important;
   }
 }
+
+/* V1.0.73 - respectă numărul de carduri vizibile configurat în Main */
+.kiosk-page[data-senior-count="1"] .senior-cards{grid-template-columns:1fr!important}.kiosk-page[data-senior-count="1"] .confirm-zones{grid-template-columns:1fr!important}.kiosk-page[data-senior-count="1"] .confirm-zone{max-width:none!important}.kiosk-page[data-senior-count="1"] .senior-person-card{text-align:left}.kiosk-page[data-senior-count="1"] .confirm-treatment-line.next:nth-child(n+3){display:none!important}
+/* V1.0.73 - font senior mai clar, mai puțin apăsat */
+.kiosk-brand b,.senior-person-card b,.kiosk-day b,.confirm-treatment-line strong,.kiosk-action b{font-weight:760!important}.kiosk-brand span,.senior-person-card span,.confirm-treatment-line small{font-weight:600!important}.kiosk-action b{letter-spacing:-.015em!important}
