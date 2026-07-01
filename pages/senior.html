@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.73</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.74</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -94,7 +94,7 @@
  </main>
 <script>
 const SESSION_KEY='familycare-senior-session';
-let session={headerCode:'CH-RO-0001', branchCode:'CB-0001', branchName:'Părinții mei'};
+let session={headerCode:'CH-RO-0001', branchCode:'', branchName:''};
 const nativeFetch=window.fetch.bind(window);
 async function apiFetch(url,options={}){const headers=new Headers(options.headers||{});if(session.token)headers.set('Authorization','Bearer '+session.token);const response=await nativeFetch(url,{...options,headers});if(response.status===401){throw new Error('Sesiune expirată');}return response;}
 let allEntities=[], allTreatments=[], visibleSeniorLimit=0, selectedEntityCode='', selectedDay=jsWeekday(new Date()), currentTreatment=null;
@@ -116,8 +116,8 @@ function jsWeekday(d){const n=d.getDay();return n===0?7:n;}
 function parseTime(t){const [h,m]=String(t||'09:00').slice(0,5).split(':').map(Number);return {h:h||0,m:m||0};}
 function dateOnly(s){if(!s)return null; const d=new Date(String(s).slice(0,10)+'T00:00:00'); return isNaN(d)?null:d;}
 function dayName(n){return ['','Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][n]||'';}
-function isSenior(e){return /senior|senioră|seniora/i.test(String(e.entity_type||''));}
-function branchMatches(e){return !session.branchCode || e.branch_code===session.branchCode || e.branch_name===session.branchName || !e.branch_code;}
+function isSenior(e){return true;}
+function branchMatches(e){return true;}
 function startOfWeek(d){const copy=new Date(d.getFullYear(),d.getMonth(),d.getDate()); copy.setDate(copy.getDate()-(jsWeekday(copy)-1)); return copy;}
 function dateForWeekday(n){const d=startOfWeek(new Date()); d.setDate(d.getDate()+Number(n)-1); return d;}
 function timeText(t){return String(t||'').slice(0,5)||'--:--';}
@@ -138,10 +138,10 @@ function isAlreadyConfirmed(t){const status=String(t.status||'').toLowerCase();i
 function severityClass(diff){if(diff<=0)return 'state-overdue'; if(diff<=5)return 'state-05'; if(diff<=10)return 'state-10'; if(diff<=20)return 'state-20'; if(diff<=30)return 'state-30'; return 'state-calm';}
 function clearSeverity(el){if(!el)return; el.classList.remove('state-calm','state-30','state-20','state-10','state-05','state-overdue','soon','urgent','alarm');}
 function updateClock(){const d=new Date(); const el=document.getElementById('currentNow'); if(el) el.textContent=`${dayName(jsWeekday(d))}, ${d.toLocaleDateString('ro-RO')} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
-function initSession(){try{session={...session,...JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')}}catch(e){} if(Number(session.expiresAt||0)<Date.now()){session={...session,headerCode:'CH-RO-0001',branchCode:session.branchCode||'CB-0001',branchName:session.branchName||'Părinții mei',expiresAt:Date.now()+365*24*60*60*1000,ts:Date.now()};try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch(e){}} updateClock(); setInterval(updateClock,30000);return true;}
+function initSession(){try{session={...session,...JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')}}catch(e){} if(Number(session.expiresAt||0)<Date.now()){session={...session,headerCode:'CH-RO-0001',branchCode:session.branchCode||'',branchName:session.branchName||'',expiresAt:Date.now()+365*24*60*60*1000,ts:Date.now()};try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch(e){}} updateClock(); setInterval(updateClock,30000);return true;}
 function selectedEntityName(){const e=allEntities.find(x=>x.entity_code===selectedEntityCode);return e?e.name:'';}
-function mergeEntities(db){const byCode=new Map(); [...FALLBACK_ENTITIES, ...(Array.isArray(db)?db:[])].forEach(e=>{if(e&&e.entity_code&&isSenior(e)&&branchMatches(e)&&(!session.singleEntity||!session.entityCode||e.entity_code===session.entityCode)) byCode.set(e.entity_code, {...(byCode.get(e.entity_code)||{}), ...e});}); return [...byCode.values()];}
-async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?branchCode='+encodeURIComponent(session.branchCode)+'&ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); const visible=visibleEntities(); if(!visible.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(visible[0]&&visible[0].entity_code)||(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}
+function mergeEntities(db){const byCode=new Map(); [...FALLBACK_ENTITIES, ...(Array.isArray(db)?db:[])].forEach(e=>{if(e&&e.entity_code&&branchMatches(e)&&(!session.singleEntity||!session.entityCode||e.entity_code===session.entityCode)) byCode.set(e.entity_code, {...(byCode.get(e.entity_code)||{}), ...e});}); return [...byCode.values()];}
+async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); const visible=visibleEntities(); if(!visible.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(visible[0]&&visible[0].entity_code)||(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}
 
 function renderSeniorCards(){const box=document.getElementById('seniorCards'); const page=document.querySelector('.kiosk-page'); const shown=visibleEntities(); const count=shown.length; const phoneRows=Math.max(1,Math.ceil(count/2)); box.dataset.count=String(count); if(page){page.classList.toggle('many-seniors',count>4);page.dataset.seniorCount=String(count);page.style.setProperty('--senior-cards-height',(phoneRows*44+(phoneRows-1)*4)+'px');page.style.setProperty('--confirm-columns',String(Math.min(2,Math.max(1,count))));} box.innerHTML=shown.map((e,index)=>{const background=validCardColor(e.card_color,CARD_PALETTE[index%CARD_PALETTE.length]);const text=validCardColor(e.card_text_color,'#FFFFFF');const active=e.entity_code===selectedEntityCode;return `<button type="button" class="senior-person-card ${active?'active':''}" data-code="${safe(e.entity_code)}" aria-pressed="${active?'true':'false'}" style="--senior-card-bg:${background};--senior-card-text:${text}"><b>${safe(e.name)}</b><span>${safe(e.entity_type)}</span></button>`;}).join('')||'<div class="kiosk-empty">Nu există beneficiar afișat</div>'; box.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   selectedEntityCode=b.dataset.code;

@@ -449,9 +449,10 @@ async function handleBeneficiaryFeedbackApi(req,res,url){
 async function handleApi(req,res,url){
  try{
   if(url.pathname==='/api/senior/entities'){
-   const branchCode=url.searchParams.get('branchCode')||'CB-0001';
+   const branchCode=url.searchParams.get('branchCode')||'';
    const entityFilter=SENIOR_ENTITY_CODE?` and e.entity_code=${dollar(SENIOR_ENTITY_CODE)}`:'';
    const displayLimit=await getSeniorDisplayLimit();
+   const branchFilter=branchCode?` and (coalesce(b.branch_code,'')=${dollar(branchCode)} or coalesce(to_jsonb(e)->>'branch_name','') in (select name from ${dq(PGSCHEMA)}.care_branch where branch_code=${dollar(branchCode)}))`:'';
    const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (
      select
        e.entity_code,
@@ -475,7 +476,7 @@ async function handleApi(req,res,url){
        order by c.id desc
        limit 1
      ) card_style on true
-     where coalesce(e.active,true)=true and coalesce(e.allows_senior_screen,true)=true and (coalesce(b.branch_code,'')=${dollar(branchCode)} or coalesce(to_jsonb(e)->>'branch_name','') in (select name from ${dq(PGSCHEMA)}.care_branch where branch_code=${dollar(branchCode)}))${entityFilter}
+     where coalesce(e.active,true)=true${branchFilter}${entityFilter}
      order by coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code)
      limit ${displayLimit||100}
    ) t;`;
@@ -503,4 +504,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.73 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.74 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'PIN required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
