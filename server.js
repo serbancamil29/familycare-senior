@@ -181,7 +181,7 @@ const TLS_PFX_PATH = process.env.TLS_PFX_PATH || path.join(ROOT, 'certs', 'famil
 const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
 const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
-// V1.0.85: Senior folosește același login ca Main, ca să lege aparținătorul de beneficiarii lui.
+// V1.0.86: Senior folosește același login ca Main, ca să lege aparținătorul de beneficiarii lui.
 // Doar pentru demo se poate dezactiva cu SENIOR_AUTH_DISABLED=true sau FAMILYCARE_AUTH_DISABLED=true.
 const SENIOR_AUTH_DISABLED = ['true','1','yes','da'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || '').trim().toLowerCase());
 const SESSION_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.SESSION_TTL_MINUTES || 720) * 60 * 1000);
@@ -369,9 +369,10 @@ async function handleSeniorLoginApi(req,res,url){
   }
   if(url.pathname==='/api/senior/session'&&req.method==='GET'){
     const state=getSeniorSession(req);
-    const effectiveEntityCode=(state&&state.entityCode)||SENIOR_ENTITY_CODE||'';
+    const effectiveEntityCode=SENIOR_ENTITY_CODE||'';
+    const preferredEntityCode=(state&&state.entityCode)||'';
     const token=cookies(req).fc_senior_session||'';if(token&&state)res.setHeader('Set-Cookie',seniorCookie(token,req,Math.floor(SESSION_TTL_MS/1000)));
-    send(res,200,JSON.stringify({ok:true,authenticated:!!state,authRequired:!SENIOR_AUTH_DISABLED,singleEntity:!!effectiveEntityCode,entityCode:effectiveEntityCode,expiresIn:SESSION_TTL_MS,headerCode:state&&state.headerCode||'',headerName:state&&state.headerName||'',branchCode:state&&state.branchCode||'',userName:state&&state.userName||'',role:state&&state.role||''}),'application/json; charset=utf-8');
+    send(res,200,JSON.stringify({ok:true,authenticated:!!state,authRequired:!SENIOR_AUTH_DISABLED,singleEntity:!!effectiveEntityCode,entityCode:effectiveEntityCode,preferredEntityCode,expiresIn:SESSION_TTL_MS,headerCode:state&&state.headerCode||'',headerName:state&&state.headerName||'',branchCode:state&&state.branchCode||'',userName:state&&state.userName||'',role:state&&state.role||''}),'application/json; charset=utf-8');
     return true;
   }
   if(url.pathname==='/api/senior/logout'&&req.method==='DELETE'){
@@ -394,8 +395,8 @@ async function handleSeniorLoginApi(req,res,url){
     loginAttempts.delete(loginKey(req));
     const scope=await ensureSeniorUserScope(found);
     openSeniorSessionFor(res,req,scope);
-    const effectiveEntityCode=scope.entityCode||SENIOR_ENTITY_CODE||'';
-    send(res,200,JSON.stringify({ok:true,expiresIn:SESSION_TTL_MS,singleEntity:!!effectiveEntityCode,entityCode:effectiveEntityCode,headerCode:scope.headerCode,headerName:scope.headerName,branchCode:scope.branchCode||'',userName:scope.userName,role:scope.role||''}),'application/json; charset=utf-8');
+    const effectiveEntityCode=SENIOR_ENTITY_CODE||'';
+    send(res,200,JSON.stringify({ok:true,expiresIn:SESSION_TTL_MS,singleEntity:!!effectiveEntityCode,entityCode:effectiveEntityCode,preferredEntityCode:scope.entityCode||'',headerCode:scope.headerCode,headerName:scope.headerName,branchCode:scope.branchCode||'',userName:scope.userName,role:scope.role||''}),'application/json; charset=utf-8');
     return true;
   }catch(e){send(res,400,JSON.stringify({ok:false,error:e.message||'Cerere invalidă.'}),'application/json; charset=utf-8');return true}
 }
@@ -508,7 +509,7 @@ async function handleFamilyContactApi(req,res,url) {
 async function handleQuickActionApi(req,res,url){
  if(url.pathname!=='/api/quick-action') return false;
  if(req.method!=='POST'){send(res,405,'Method not allowed'); return true}
- try{const b=await readJson(req);const session=getSeniorSession(req)||{};const payload=JSON.stringify({Actiune:b.action||'actiune',Entitate:b.entityName||'',Mesaj:b.message||'',Data:new Date().toISOString(),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':session.entityCode||''}); const sql=`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('senior-actions', ${dollar(payload)}::jsonb, 100) returning json_build_object('ok',true,'id',id)::text;`; const out=await runPsql(sql); send(res,200,out||'{"ok":true}','application/json; charset=utf-8'); return true;}catch(e){send(res,500,e.message||'Database error'); return true}
+ try{const b=await readJson(req);const session=getSeniorSession(req)||{};const requestEntityCode=String(b.entityCode||b['Cod entitate']||session.entityCode||'').trim();const payload=JSON.stringify({Actiune:b.action||'actiune',Entitate:b.entityName||'',Mesaj:b.message||'',Data:new Date().toISOString(),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':requestEntityCode}); const sql=`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('senior-actions', ${dollar(payload)}::jsonb, 100) returning json_build_object('ok',true,'id',id)::text;`; const out=await runPsql(sql); send(res,200,out||'{"ok":true}','application/json; charset=utf-8'); return true;}catch(e){send(res,500,e.message||'Database error'); return true}
 }
 
 
@@ -523,18 +524,19 @@ async function handleTreatmentConfirmApi(req, res, url) {
     const startTime = b.startTime || '';
     const occurrenceKey = b.occurrenceKey || '';
     const session=getSeniorSession(req)||{};
+    const requestEntityCode=String(b.entityCode||b['Cod entitate']||session.entityCode||'').trim();
     const payload = JSON.stringify({
       Tip:'confirmare-tratament', Tratament:title, Senior:entityName, Ora:startTime,
-      OccurrenceKey:occurrenceKey, ConfirmatLa:new Date().toISOString(),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':session.entityCode||''
+      OccurrenceKey:occurrenceKey, ConfirmatLa:new Date().toISOString(),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':requestEntityCode
     });
     const decisionPayload = JSON.stringify({
       Senior:entityName, Tratament:title, 'Ora planificată':startTime,
       Decizie:'Administrat / efectuat', Motiv:'', 'Înregistrat la':new Date().toISOString(),
-      OccurrenceKey:occurrenceKey, 'ID tratament':treatmentId || '',HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':session.entityCode||''
+      OccurrenceKey:occurrenceKey, 'ID tratament':treatmentId || '',HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':requestEntityCode
     });
     let cfg = null;
     if (treatmentId) {
-      const q = `select coalesce((select jsonb_build_object('email_on_finish',cs.email_on_finish,'email_recipients',cs.email_recipients,'title',cs.title,'start_time',cs.start_time::text)::text from ${dq(PGSCHEMA)}.calendar_series cs left join ${dq(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id left join ${dq(PGSCHEMA)}.care_branch br on br.id=coalesce(cs.care_branch_id,e.care_branch_id) left join ${dq(PGSCHEMA)}.care_header h on h.id=coalesce(cs.care_header_id,e.care_header_id) where cs.id=${treatmentId}${session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:''}${session.branchCode?` and br.branch_code=${dollar(session.branchCode)}`:''}${session.entityCode?` and e.entity_code=${dollar(session.entityCode)}`:''}), '{}');`;
+      const q = `select coalesce((select jsonb_build_object('email_on_finish',cs.email_on_finish,'email_recipients',cs.email_recipients,'title',cs.title,'start_time',cs.start_time::text)::text from ${dq(PGSCHEMA)}.calendar_series cs left join ${dq(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id left join ${dq(PGSCHEMA)}.care_branch br on br.id=coalesce(cs.care_branch_id,e.care_branch_id) left join ${dq(PGSCHEMA)}.care_header h on h.id=coalesce(cs.care_header_id,e.care_header_id) where cs.id=${treatmentId}${session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:''}${session.branchCode?` and br.branch_code=${dollar(session.branchCode)}`:''}), '{}');`;
       try { cfg = JSON.parse(await runPsql(q) || '{}'); } catch(_) { cfg = {}; }
       if(!cfg||!cfg.title){send(res,403,JSON.stringify({ok:false,error:'Tratamentul nu aparține beneficiarului autentificat.'}),'application/json; charset=utf-8');return true}
     }
@@ -571,11 +573,12 @@ async function handleTreatmentDecisionApi(req,res,url){
   const decision=allowed.includes(String(b.decision||''))?String(b.decision):'';
   if(!decision){send(res,400,JSON.stringify({ok:false,error:'Decizie invalidă.'}),'application/json; charset=utf-8');return true}
   const treatmentId=Number(b.treatmentId||0);
-  if(treatmentId){const permitted=Number(await runPsql(`select count(*) from ${dq(PGSCHEMA)}.calendar_series cs left join ${dq(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id left join ${dq(PGSCHEMA)}.care_branch br on br.id=coalesce(cs.care_branch_id,e.care_branch_id) left join ${dq(PGSCHEMA)}.care_header h on h.id=coalesce(cs.care_header_id,e.care_header_id) where cs.id=${treatmentId}${session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:''}${session.branchCode?` and br.branch_code=${dollar(session.branchCode)}`:''}${session.entityCode?` and e.entity_code=${dollar(session.entityCode)}`:''};`)||0);if(permitted!==1){send(res,403,JSON.stringify({ok:false,error:'Tratamentul nu aparține ramurii autentificate.'}),'application/json; charset=utf-8');return true}}
+  if(treatmentId){const permitted=Number(await runPsql(`select count(*) from ${dq(PGSCHEMA)}.calendar_series cs left join ${dq(PGSCHEMA)}.managed_entity e on e.id=cs.entity_id left join ${dq(PGSCHEMA)}.care_branch br on br.id=coalesce(cs.care_branch_id,e.care_branch_id) left join ${dq(PGSCHEMA)}.care_header h on h.id=coalesce(cs.care_header_id,e.care_header_id) where cs.id=${treatmentId}${session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:''}${session.branchCode?` and br.branch_code=${dollar(session.branchCode)}`:''};`)||0);if(permitted!==1){send(res,403,JSON.stringify({ok:false,error:'Tratamentul nu aparține ramurii autentificate.'}),'application/json; charset=utf-8');return true}}
+  const requestEntityCode=String(b.entityCode||b['Cod entitate']||session.entityCode||'').trim();
   const payload=JSON.stringify({
    Senior:String(b.entityName||'').slice(0,160),Tratament:String(b.title||'Tratament').slice(0,240),
    'Ora planificată':String(b.startTime||'').slice(0,20),Decizie:decision,Motiv:String(b.reason||'').slice(0,1000),
-   'Înregistrat la':new Date().toISOString(),OccurrenceKey:String(b.occurrenceKey||'').slice(0,300),'ID tratament':String(b.treatmentId||'').slice(0,40),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':session.entityCode||''
+   'Înregistrat la':new Date().toISOString(),OccurrenceKey:String(b.occurrenceKey||'').slice(0,300),'ID tratament':String(b.treatmentId||'').slice(0,40),HeaderCode:session.headerCode||'',BranchCode:session.branchCode||'','Cod entitate':requestEntityCode
   });
   await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('treatment-decisions', ${dollar(payload)}::jsonb, 10);`);
   send(res,200,'{"ok":true}','application/json; charset=utf-8');return true;
@@ -609,7 +612,7 @@ async function handleApi(req,res,url){
   if(url.pathname==='/api/senior/entities'){
    const requestedBranchCode=url.searchParams.get('branchCode')||'';
    const session=getSeniorSession(req);
-   const scopedEntityCode=(session&&session.entityCode)||SENIOR_ENTITY_CODE||'';
+   const scopedEntityCode=SENIOR_ENTITY_CODE||'';
    const entityFilter=scopedEntityCode?` and e.entity_code=${dollar(scopedEntityCode)}`:'';
    const headerFilter=session&&session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:'';
    const displayLimit=await getSeniorDisplayLimit(session||{});
@@ -647,7 +650,7 @@ async function handleApi(req,res,url){
   }
   if(url.pathname==='/api/treatment'){
    const session=getSeniorSession(req);
-   const scopedEntityCode=(session&&session.entityCode)||SENIOR_ENTITY_CODE||'';
+   const scopedEntityCode=SENIOR_ENTITY_CODE||'';
    const entityFilter=scopedEntityCode?` and e.entity_code=${dollar(scopedEntityCode)}`:'';
    const headerFilter=session&&session.headerCode?` and h.header_code=${dollar(session.headerCode)}`:'';
    const branchFilter=session&&session.branchCode?` and br.branch_code=${dollar(session.branchCode)}`:'';
@@ -684,4 +687,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.85 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V1.0.86 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});

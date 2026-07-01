@@ -13,7 +13,7 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page no-program-strip">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.85</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.86</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" type="button">Dark</button>
      <button id="languageBtn" type="button">RO</button>
@@ -136,7 +136,7 @@ async function initSession(){
   const r=await nativeFetch('/api/senior/session?ts='+Date.now(),{cache:'no-store'});
   const remote=await r.json();
   if(!remote.authenticated && remote.authRequired!==false){localStorage.removeItem(SESSION_KEY);location.replace('senior-login.html');return false;}
-  session={...session,headerCode:remote.headerCode||session.headerCode||'',headerName:remote.headerName||session.headerName||'',branchCode:remote.branchCode||session.branchCode||'',userName:remote.userName||session.userName||'',role:remote.role||session.role||'',authRequired:remote.authRequired!==false,singleEntity:!!remote.singleEntity,entityCode:remote.entityCode||session.entityCode||'',expiresAt:Date.now()+Number(remote.expiresIn||43200000),ts:Date.now()};
+  session={...session,headerCode:remote.headerCode||session.headerCode||'',headerName:remote.headerName||session.headerName||'',branchCode:remote.branchCode||session.branchCode||'',userName:remote.userName||session.userName||'',role:remote.role||session.role||'',authRequired:remote.authRequired!==false,singleEntity:!!remote.singleEntity,entityCode:remote.entityCode||'',preferredEntityCode:remote.preferredEntityCode||session.preferredEntityCode||session.entityCode||'',expiresAt:Date.now()+Number(remote.expiresIn||43200000),ts:Date.now()};
   try{localStorage.setItem(SESSION_KEY,JSON.stringify(session));}catch(e){}
  }catch(e){
   if(Number(session.expiresAt||0)<Date.now()){location.replace('senior-login.html');return false;}
@@ -145,7 +145,7 @@ async function initSession(){
 }
 function selectedEntityName(){const e=allEntities.find(x=>x.entity_code===selectedEntityCode);return e?e.name:'';}
 function mergeEntities(db){const source=[...(Array.isArray(db)?db:[])];const byCode=new Map();source.forEach(e=>{if(e&&e.entity_code&&branchMatches(e)&&(!session.singleEntity||!session.entityCode||e.entity_code===session.entityCode)) byCode.set(e.entity_code,{...(byCode.get(e.entity_code)||{}),...e});});return [...byCode.values()];}
-async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); const visible=visibleEntities(); if(!visible.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(visible[0]&&visible[0].entity_code)||(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}
+async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); const visible=visibleEntities(); const preferred=session.preferredEntityCode||session.entityCode||''; if(!visible.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(preferred&&visible.some(e=>e.entity_code===preferred)?preferred:'')||(visible[0]&&visible[0].entity_code)||(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}
 
 function renderSeniorCards(){const box=document.getElementById('seniorCards'); const page=document.querySelector('.kiosk-page'); const shown=visibleEntities(); const count=shown.length; const phoneRows=Math.max(1,Math.ceil(count/2)); box.dataset.count=String(count); if(page){page.classList.toggle('many-seniors',count>4);page.dataset.seniorCount=String(count);page.style.setProperty('--senior-cards-height',(phoneRows*44+(phoneRows-1)*4)+'px');page.style.setProperty('--confirm-columns',String(Math.min(2,Math.max(1,count))));} box.innerHTML=shown.map((e,index)=>{const background=validCardColor(e.card_color,CARD_PALETTE[index%CARD_PALETTE.length]);const text=validCardColor(e.card_text_color,'#FFFFFF');const active=e.entity_code===selectedEntityCode;return `<button type="button" class="senior-person-card ${active?'active':''}" data-code="${safe(e.entity_code)}" aria-pressed="${active?'true':'false'}" style="--senior-card-bg:${background};--senior-card-text:${text}"><b>${safe(e.name)}</b><span>${safe(e.entity_type)}</span></button>`;}).join('')||'<div class="kiosk-empty">Nu există beneficiar afișat</div>'; box.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   selectedEntityCode=b.dataset.code;
@@ -298,7 +298,7 @@ async function confirmCurrentTreatment(){
  if(!t)return;
  const key=t.occurrence_key||keyFromTarget(t,t.target);
  try{
-  const response=await apiFetch('/api/treatment/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({treatmentId:t.id,title:t.title,entityName:t.entity_name||selectedEntityName(),startTime:timeText(t.start_time),occurrenceKey:key,emailRecipients:t.email_recipients,emailOnFinish:t.email_on_finish})});
+  const response=await apiFetch('/api/treatment/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({treatmentId:t.id,title:t.title,entityName:t.entity_name||selectedEntityName(),entityCode:t.entity_code||selectedEntityCode,startTime:timeText(t.start_time),occurrenceKey:key,emailRecipients:t.email_recipients,emailOnFinish:t.email_on_finish})});
   if(!response.ok)throw new Error(await response.text());
   confirmedKeys.add(key);resolvedDecisions[key]='Administrat / efectuat';saveConfirmedKeys();saveResolvedDecisions();stopAlarm();
   toast(`${t.entity_name||selectedEntityName()}: ${t.title} confirmat`);logQuickAction('confirm-treatment',`${t.entity_name||''} - ${t.title} - ${timeText(t.start_time)}`);currentTreatment=null;closeTreatmentDecision();renderTreatments();
@@ -307,14 +307,14 @@ async function confirmCurrentTreatment(){
 async function recordRefusal(){
  const t=currentTreatment;if(!t)return;const key=t.occurrence_key||keyFromTarget(t,t.target);const reason=[document.getElementById('refusalReason').value,document.getElementById('refusalDetails').value.trim()].filter(Boolean).join(': ');
  try{
-  const response=await apiFetch('/api/treatment/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({treatmentId:t.id,title:t.title,entityName:t.entity_name||selectedEntityName(),startTime:timeText(t.start_time),occurrenceKey:key,decision:'Refuzat',reason})});
+  const response=await apiFetch('/api/treatment/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({treatmentId:t.id,title:t.title,entityName:t.entity_name||selectedEntityName(),entityCode:t.entity_code||selectedEntityCode,startTime:timeText(t.start_time),occurrenceKey:key,decision:'Refuzat',reason})});
   if(!response.ok)throw new Error(await response.text());
   resolvedDecisions[key]='Refuzat';saveResolvedDecisions();stopAlarm();toast('Decizia a fost înregistrată și va fi văzută de persoana responsabilă.');logQuickAction('refuz-treatment',`${t.entity_name||''} - ${t.title} - ${reason}`);currentTreatment=null;closeTreatmentDecision();renderTreatments();
  }catch(e){toast('Decizia nu a fost salvată. Cere ajutor.');}
 }
 function cleanPhone(p){return String(p||'').replace(/[^+0-9]/g,'');}
 async function loadFamilyContact(entityCode){try{const code=entityCode||selectedEntityCode||'';const r=await apiFetch('/api/family-contact?entityCode='+encodeURIComponent(code)+'&ts='+Date.now()); if(r.ok)familyContact=await r.json();}catch(e){}}
-async function logQuickAction(action,message){try{await apiFetch('/api/quick-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,entityName:selectedEntityName(),message})});}catch(e){}}
+async function logQuickAction(action,message){try{await apiFetch('/api/quick-action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,entityName:selectedEntityName(),entityCode:selectedEntityCode,message})});}catch(e){}}
 function toast(msg){const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2200);}
 function startAlarm(){if(alarmTimer||!soundAllowed)return; alarmTimer=setInterval(()=>playAlarmSound(false),1800); playAlarmSound(false);}
 function stopAlarm(){if(alarmTimer){clearInterval(alarmTimer); alarmTimer=null;}}
