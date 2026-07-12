@@ -1,11 +1,13 @@
-const CACHE = 'familycare-senior-v2.0.1';
-const SHELL = ['/pages/senior-login.html','/pages/senior.html','/styles/common.css','/styles/senior-kiosk.css','/assets/logo.svg','/assets/icon-192.png','/assets/icon-512.png','/manifest.webmanifest','/offline.html'];
+const CACHE = 'familycare-main-v3.0.0';
+const SHELL = ['/pages/main-login.html','/styles/common.css','/styles/compliance.css','/styles/reports.css','/assets/logo.svg','/assets/icon-192.png','/assets/icon-512.png','/manifest.webmanifest','/offline.html'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting())));
-self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('familycare-senior-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
+self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key.startsWith('familycare-main-') && key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  // Paginile administrative pot conține context sensibil: nu sunt stocate offline.
+  if (request.mode === 'navigate' && url.pathname !== '/pages/main-login.html') return;
   event.respondWith(fetch(request).then(response => {
     if (response.ok) caches.open(CACHE).then(cache => cache.put(request, response.clone()));
     return response;

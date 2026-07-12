@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <script>
+(function(){
+  try {
+    if (localStorage.getItem('familycare-theme') === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+    }
+  } catch (e) {}
+})();
+</script>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Configurări - FamilyCare</title>
+ <link rel="stylesheet" href="../styles/common.css?v=3.0.0">
+ <link rel="stylesheet" href="../styles/config.css?v=3.0.0">
+</head>
+<body>
+<div class="app-shell">
+ <aside class="sidebar">
+  <a class="brand" href="dashboard.html">
+   <img src="../assets/logo.svg" alt="FamilyCare logo">
+   <div><div class="brand-title">FamilyCare</div><div class="brand-subtitle">by Cademix</div><div class="brand-version">v3.0.0</div></div>
+  </a>
+  <button class="menu-toggle" type="button" id="menuToggle" title="Restrânge meniul">☰</button>
+  <nav class="nav"><a class="" href="dashboard.html"><span class="ico">🏠</span><span>Dashboard</span></a>
+<a class="" href="journal.html"><span class="ico">📝</span><span>Jurnal</span></a>
+<a class="" href="agenda.html"><span class="ico">📅</span><span>Agenda</span></a>
+<a class="" href="reports.html"><span class="ico">▦</span><span>Rapoarte</span></a>
+<a class="active" href="config.html"><span class="ico">⚙️</span><span>Configurări</span></a>
+<a class="" href="compliance.html"><span class="ico">✓</span><span>Conformitate</span></a>
+<a class="" href="#senior" data-senior-link target="_blank" rel="noopener"><span class="ico">👤</span><span>Ecran Senior</span></a></nav>
+  <div class="theme-switch" aria-label="Teme"><button class="btn-light" type="button" data-theme="light">Light</button><button class="btn-dark" type="button" data-theme="dark">Dark</button></div>
+ </aside>
+ <main class="main">
+  <div class="topbar">
+   <div>
+    <div class="eyebrow">FamilyCare by Cademix</div>
+    <h1 class="page-title">Configurări</h1>
+    <p class="page-lead">Structură, persoane, entități și nomenclatoare.</p>
+   </div>
+   <div class="context-card">
+     <div class="context-row"><div><span class="muted">ID organizație</span><br><b>CH-RO-0001</b></div><span class="pill">Familie / furnizor</span></div>
+    <div class="context-selects"><select><option>Părinții mei</option><option>Familia mea</option><option>Părinții soției</option><option>Cămin seniori</option></select><select><option>Maria Popescu · senioră</option><option>Ion Popescu · senior</option><option>Ana Popescu · copil</option><option>Casa din Iași · locuință</option><option>Rex · animal de companie</option><option>Mașina tatălui · vehicul</option></select></div>
+   </div>
+  </div>
+  <section class="section card admin-start"><div><span class="eyebrow">Administrare simplificată</span><h2>Ce dorești să configurezi?</h2><p class="muted">Alege o acțiune uzuală. Setările tehnice rămân disponibile separat.</p></div><div class="admin-start-actions"><a class="admin-action" href="config.html?section=care-persons"><span>👤</span><b>Adaugă sau modifică seniori</b><small>Beneficiari, telefon și acces Senior</small></a><a class="admin-action" href="config.html?section=family-tree"><span>👪</span><b>Relații și aparținători</b><small>Cine îngrijește și cine este contactat</small></a><a class="admin-action" href="config.html?section=alert-rules"><span>🔔</span><b>Alerte și notificări</b><small>Când și cum se trimit alertele</small></a><a class="admin-action" href="config.html?section=senior-sound-settings"><span>🔊</span><b>Ecranul Senior</b><small>Sunet, aspect și comportament</small></a></div><div class="admin-mode"><button class="btn primary" id="simpleMode" type="button">Setări uzuale</button><button class="btn" id="advancedMode" type="button">Setări avansate</button><span class="mode-status" id="modeStatus" aria-live="polite"></span></div></section><section class="section config-navigation" aria-labelledby="configNavTitle">
+   <div class="config-nav-head"><div><h2 id="configNavTitle">Alege zona de configurare</h2><p class="muted">Opțiunile sunt grupate după scop, fără să schimbe datele existente.</p></div></div>
+   <div class="config-select-wrap"><label for="configSectionSelect">Secțiune</label><select id="configSectionSelect">
+     <optgroup label="Organizație și beneficiari"><option value="care-header">Organizație / cont</option><option value="branches">Grupuri / locații</option><option value="care-persons">Beneficiari</option><option value="family-tree">Relații și aparținători</option></optgroup>
+     <optgroup label="Echipă și parteneri"><option value="users">Utilizatori și roluri</option><option value="access-accounts">Acces, parole și PIN</option><option value="doctors">Medici</option><option value="providers">Furnizori</option><option value="family-contact">Contacte familie</option></optgroup>
+     <optgroup label="Comunicare și automatizări"><option value="alert-rules">Alerte</option><option value="task-types">Tipuri activități</option><option value="mail-settings">Email și notificări</option></optgroup>
+     <optgroup label="Aspect și abonament"><option value="senior-card-colors">Carduri Senior</option><option value="senior-sound-settings">Sunet Senior</option><option value="subscription-plans">Abonament</option><option value="info">Informații sistem</option></optgroup>
+     <optgroup class="advanced-option" label="Avansat"><option value="entity-types">Tipuri beneficiari</option><option value="notification-channels">Canale tehnice</option><option value="mail-center">Conturi mesagerie</option></optgroup>
+   </select></div>
+   <div class="config-groups" id="tabs">
+     <div class="config-group" data-mode="usual"><h3>Organizație și beneficiari</h3><div class="config-tabs"><button type="button" data-section="care-header">Organizație / cont</button><button type="button" data-section="branches">Grupuri / locații</button><button type="button" data-section="care-persons">Beneficiari</button><button type="button" data-section="family-tree">Relații și aparținători</button></div></div>
+     <div class="config-group" data-mode="usual"><h3>Echipă și parteneri</h3><div class="config-tabs"><button type="button" data-section="users">Utilizatori și roluri</button><button type="button" data-section="access-accounts">Acces, parole și PIN</button><button type="button" data-section="doctors">Medici</button><button type="button" data-section="providers">Furnizori</button><button type="button" data-section="family-contact">Contacte familie</button></div></div>
+     <div class="config-group" data-mode="usual"><h3>Comunicare</h3><div class="config-tabs"><button type="button" data-section="alert-rules">Alerte</button><button type="button" data-section="task-types">Tipuri activități</button><button type="button" data-section="mail-settings">Email și notificări</button></div></div>
+     <div class="config-group" data-mode="usual"><h3>Aspect și abonament</h3><div class="config-tabs"><button type="button" data-section="senior-card-colors">Carduri Senior</button><button type="button" data-section="senior-sound-settings">Sunet Senior</button><button type="button" data-section="subscription-plans">Abonament</button></div></div>
+     <div class="config-group advanced-config-group" data-mode="advanced"><h3>Administrare avansată</h3><p class="muted">Nomenclatoare și integrare tehnică. Modifică aceste valori numai dacă știi efectul lor.</p><div class="config-tabs"><button type="button" data-section="entity-types">Tipuri beneficiari</button><button type="button" data-section="notification-channels">Canale tehnice</button><button type="button" data-section="mail-center">Conturi mesagerie</button><button type="button" data-section="info">Informații sistem</button></div></div>
+   </div>
+  </section>
+  <section class="section card config-editor"><div class="config-editor-head"><div><h2 class="section-title" id="cfgTitle">Organizație / cont</h2><p class="muted" id="cfgDesc">Identitatea familiei sau a furnizorului.</p></div><button class="btn primary" id="addBtn">Adaugă</button></div><div id="configEnhancements"></div><div id="dbError"></div><div class="table-wrap" id="cfgTableWrap" style="margin-top:14px"><table id="cfgTable"><thead></thead><tbody></tbody></table></div></section><section class="section card"><h2 class="section-title">Model scalabil de organizare</h2><div class="detail-grid"><div class="detail-box"><b>Organizație / cont</b><br><span class="muted">Familie, companie sau furnizor național.</span></div><div class="detail-box"><b>Grupuri / locații</b><br><span class="muted">Familia, casa, locația sau căminul în care organizezi beneficiarii.</span></div><div class="detail-box"><b>Beneficiari</b><br><span class="muted">De la un senior la sute de beneficiari, filtrați pe unitate.</span></div></div></section><div class="modal-backdrop" id="modal"><div class="modal"><div class="modal-head"><h3 class="modal-title" id="modalTitle">Adaugă</h3><button class="xbtn" id="closeModal">×</button></div><div class="modal-body"><div id="modalMessage" class="app-modal-message" hidden></div><form id="cfgForm" class="form-grid"></form><div style="margin-top:18px;display:flex;gap:10px;justify-content:flex-end"><button class="btn" id="cancelBtn" type="button">Renunță</button><button class="btn primary" id="saveBtn" type="button">Salvează</button></div></div></div></div>
+ </main>
+</div>
+<script>
+(function(){
+ const KEY = 'familycare-theme';
+ const saved = localStorage.getItem(KEY) || 'light';
+ const apply = (theme) => {
+  document.documentElement.classList.toggle('dark-theme', theme === 'dark');
+  document.body.classList.toggle('dark-theme', theme === 'dark');
+  localStorage.setItem(KEY, theme);
+  document.querySelectorAll('[data-theme]').forEach(btn => {
+   btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+ };
+ apply(saved === 'dark' ? 'dark' : 'light');
+ document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => apply(btn.dataset.theme));
+ });
+})();
+</script>
+<script>
+const meta={'access-accounts':['Persoană','Utilizator','Rol','Parolă','PIN'],'care-header': ['Denumire', 'Tip context', 'Coordonator', 'Detalii'], 'branches': ['Organizație / cont','Denumire ramificație', 'Tip', 'Oraș', 'Arie / județ / țară', 'Coordonator'], 'care-persons': ['Organizație / cont','Denumire', 'Tip entitate', 'Ramificație', 'Adresă / detalii', 'Responsabil'], 'entity-types': ['Tip entitate', 'Categorie', 'Are domiciliu/adresă', 'Interfață dedicată', 'Detalii'], 'family-tree': ['Persoană 1', 'Relație', 'Persoană 2', 'Observații'], 'users': ['Nume', 'Email', 'Rol', 'Domiciliu complet'], 'doctors': ['Nume medic', 'Specialitate', 'Telefon', 'Domiciliu/cabinet'], 'providers': ['Denumire', 'Tip furnizor', 'Telefon', 'Adresă completă'], 'family-contact': ['Nume','Nume principal','Telefon principal','Nume secundar','Telefon secundar','Nume al treilea','Telefon al treilea','Email','Mesaj SMS','Mesaj ajutor'], 'senior-card-colors': ['Cod entitate','Culoare fundal','Culoare text'], 'senior-sound-settings': ['Tip sunet','Volum','Activ'], 'mail-settings': ['Email','Parolă','Activ'], 'task-types': ['Denumire', 'Categorie', 'Recurent', 'Detalii'], 'alert-rules': ['Denumire', 'Condiție', 'Escaladare', 'Canal'], 'notification-channels': ['Canal', 'Tip', 'Activ', 'Telefon principal', 'Telefon secundar', 'Telefon al treilea', 'Detalii'], 'mail-center': ['Cont','Tip','Status','Detalii'], 'subscription-plans': ['Plan', 'Preț', 'Limită persoane', 'Detalii'], 'info': ['Cheie', 'Valoare', 'Categorie', 'Detalii']};
+const names={'access-accounts':'Acces, parole și PIN','care-header':'Organizație / cont','branches':'Grupuri / locații','care-persons':'Beneficiari','entity-types':'Tipuri beneficiari','family-tree':'Relații și aparținători','users':'Utilizatori și roluri','doctors':'Medici','providers':'Furnizori','family-contact':'Contacte familie','senior-card-colors':'Carduri Senior','senior-sound-settings':'Sunet ecran Senior','mail-settings':'Email și notificări','task-types':'Tipuri activități','alert-rules':'Alerte','notification-channels':'Canale tehnice','mail-center':'Conturi mesagerie','subscription-plans':'Abonament','info':'Informații'};
+const fieldLabels={'care-header':{'Denumire':'Denumire organizație / familie','Tip context':'Tip operare'},'branches':{'Organizație / cont':'Organizație / cont','Denumire ramificație':'Denumire grup / locație','Tip':'Tip unitate','Oraș':'Localitate','Arie / județ / țară':'Arie, județ sau țară'},'care-persons':{'Organizație / cont':'Organizație / cont','Denumire':'Nume beneficiar','Tip entitate':'Tip beneficiar','Ramificație':'Grup / locație'}};
+function fieldLabel(section,column){return fieldLabels[section]?.[column]||column;}
+let current='care-header', rows=[], editId=null, seniorChoices=[], branchChoices=[], headerChoices=[];
+function safe(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function appNotice(message,type='info'){
+  const text=String(message||'').trim(); if(!text) return;
+  let host=document.getElementById('appNoticeStack');
+  if(!host){host=document.createElement('div');host.id='appNoticeStack';host.className='app-notice-stack';document.body.appendChild(host);}
+  const item=document.createElement('div');
+  item.className='app-notice '+(type==='error'?'error':type==='success'?'success':'info');
+  item.innerHTML='<strong>'+(type==='error'?'Atenție':type==='success'?'Salvat':'Informație')+'</strong><span>'+safe(text)+'</span><button type="button" aria-label="Închide">×</button>';
+  item.querySelector('button').onclick=()=>item.remove();
+  host.appendChild(item);
+  setTimeout(()=>item.remove(),6500);
+}
+function modalMessage(message,type='error'){
+  const box=document.getElementById('modalMessage'); if(!box){appNotice(message,type);return;}
+  box.className='app-modal-message '+(type==='error'?'error':type==='success'?'success':'info');
+  box.textContent=String(message||''); box.hidden=false;
+}
+function clearModalMessage(){const box=document.getElementById('modalMessage'); if(box){box.hidden=true;box.textContent='';}}
+function appConfirm(message){
+  return new Promise(resolve=>{
+    const old=document.getElementById('appConfirmBackdrop'); if(old) old.remove();
+    const back=document.createElement('div'); back.id='appConfirmBackdrop'; back.className='app-confirm-backdrop';
+    back.innerHTML='<div class="app-confirm"><h3>Confirmare</h3><p>'+safe(message)+'</p><div class="app-confirm-actions"><button type="button" class="btn" data-no>Renunță</button><button type="button" class="btn danger" data-yes>Șterge</button></div></div>';
+    document.body.appendChild(back);
+    const done=(v)=>{back.remove();resolve(v);};
+    back.querySelector('[data-no]').onclick=()=>done(false);
+    back.querySelector('[data-yes]').onclick=()=>done(true);
+    back.onclick=e=>{if(e.target===back)done(false);};
+  });
+}
+async function api(url,opts){const r=await fetch(url,opts); if(!r.ok) throw new Error(await r.text()); return r.json();}
+const PLAN_PRICES={Basic:{1:'4,99 €',3:'13,49 €',6:'25,49 €',12:'47,99 €'},Family:{1:'8,99 €',3:'24,29 €',6:'45,89 €',12:'86,29 €'},Premium:{1:'14,99 €',3:'40,49 €',6:'76,49 €',12:'143,89 €'},Unlimited:{1:'24,99 €',3:'67,49 €',6:'127,49 €',12:'239,89 €'}};
+const PLAN_DETAILS={Basic:'1 aparținător notificat · maximum 2 beneficiari',Family:'până la 3 aparținători notificați · maximum 2 beneficiari',Premium:'notificări nelimitate · maximum 4 beneficiari',Unlimited:'beneficiari și aparținători nelimitați'};
+async function upsertSingle(section,payload){let existing=[];try{existing=await api('/api/config/'+section+'?ts='+Date.now())||[];}catch(_){}const first=existing[0];return api('/api/config/'+section+(first?'/'+first.id:''),{method:first?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});}
+async function renderConfigEnhancements(section){
+ const host=document.getElementById('configEnhancements');const tableWrap=document.getElementById('cfgTableWrap');const add=document.getElementById('addBtn');host.innerHTML='';tableWrap.hidden=section==='subscription-plans';add.hidden=section==='subscription-plans'||section==='access-accounts';
+ if(section==='senior-card-colors'){
+  let setting={};try{const list=await api('/api/config/senior-display-settings?ts='+Date.now());setting=list?.[0]?.payload||{};}catch(_){}
+  const value=String(setting['Număr carduri vizibile']||'0');
+  host.innerHTML='<div class="inline-setting"><div><b>Câte carduri Senior se afișează</b><span>Alege în funcție de numărul de beneficiari. „Automat” folosește toate persoanele disponibile, până la 100.</span></div><select id="visibleSeniorCards"><option value="0">Automat</option>'+[1,2,3,4,6,8,12,25,50,100].map(n=>'<option value="'+n+'" '+(value===String(n)?'selected':'')+'>'+n+' card'+(n===1?'':'uri')+'</option>').join('')+'</select><button class="btn primary" id="saveVisibleCards" type="button">Salvează afișarea</button></div>';
+  document.getElementById('saveVisibleCards').onclick=async()=>{try{await upsertSingle('senior-display-settings',{'Număr carduri vizibile':document.getElementById('visibleSeniorCards').value});document.getElementById('saveVisibleCards').textContent='Salvat';}catch(e){appNotice('Nu s-a putut salva: '+e.message,'error')}};
+ }
+ if(section==='subscription-plans'){
+  let status={plan:'Basic',periodMonths:1};try{status=await api('/api/subscription/status?ts='+Date.now());}catch(_){}
+  const plans=Object.keys(PLAN_PRICES);const periods=[1,3,6,12];
+  host.innerHTML='<div class="subscription-manager"><div class="subscription-head"><div><b>Plan activ și limite aplicate</b><span>Limitele sunt verificate la adăugarea beneficiarilor și la destinatarii notificărilor.</span></div><label>Plan<select id="activePlan">'+plans.map(p=>'<option '+(p===status.plan?'selected':'')+'>'+p+'</option>').join('')+'</select></label><label>Perioadă<select id="activePeriod">'+periods.map(p=>'<option value="'+p+'" '+(Number(status.periodMonths)===p?'selected':'')+'>'+p+' lun'+(p===1?'ă':'i')+'</option>').join('')+'</select></label><button class="btn primary" id="saveSubscription" type="button">Activează planul</button></div><div class="subscription-table-wrap"><table class="subscription-table"><thead><tr><th>Plan</th><th>1 lună</th><th>3 luni</th><th>6 luni</th><th>12 luni</th></tr></thead><tbody>'+plans.map(p=>'<tr class="'+(p===status.plan?'current-plan':'')+'"><td><b>'+p+'</b><small>'+PLAN_DETAILS[p]+'</small></td>'+periods.map(m=>'<td>'+PLAN_PRICES[p][m]+'</td>').join('')+'</tr>').join('')+'</tbody></table></div><div class="plan-features"><article><b>Confirmare tratament</b><span>Înregistrare cu dată, oră și beneficiar.</span></article><article><b>Doză omisă</b><span>Alertă și escaladare configurabilă.</span></article><article><b>Familie notificată</b><span>Numărul de destinatari depinde de plan.</span></article><article><b>Jurnal și simptome</b><span>Istoric centralizat și filtrabil.</span></article><article><b>Export pentru medic</b><span>Disponibil în modulul Rapoarte.</span></article></div></div>';
+  document.getElementById('saveSubscription').onclick=async()=>{const plan=document.getElementById('activePlan').value;const months=Number(document.getElementById('activePeriod').value);try{await upsertSingle('subscription-selection',{Plan:plan,'Perioadă luni':months,Preț:PLAN_PRICES[plan][months],'Activ din':new Date().toISOString()});document.getElementById('saveSubscription').textContent='Plan activat';setTimeout(()=>load('subscription-plans'),500);}catch(e){appNotice('Nu s-a putut salva planul: '+e.message,'error')}};
+ }
+}
+async function load(section){if(!meta[section])section='care-header';current=section; document.querySelectorAll('[data-section]').forEach(b=>b.classList.toggle('active',b.dataset.section===section)); const sectionSelect=document.getElementById('configSectionSelect');if(sectionSelect)sectionSelect.value=section;document.getElementById('cfgTitle').textContent=names[section]; const descriptions={'access-accounts':'Resetează parola și configurează un PIN de 4 cifre pentru fiecare senior sau membru al rețelei.','care-header':'Identitatea familiei, companiei sau furnizorului care folosește FamilyCare.','branches':'Grupuri de beneficiari: familia, casa, locația sau căminul. Pentru o familie simplă poți folosi un singur grup, de exemplu „Familia mea”.','care-persons':'Beneficiarii alocați unei organizații și unui grup / locație. Când adaugi beneficiar, alegi aici ramura corectă.','entity-types':'Categoriile tehnice disponibile pentru beneficiari.','family-tree':'Relațiile dintre beneficiari și aparținători, fără dublarea contactelor de urgență.','users':'Conturile și rolurile echipei.','doctors':'Directorul medicilor și specialităților.','providers':'Directorul furnizorilor de servicii.','family-contact':'Lista unică de persoane apelate sau notificate de ecranul Senior.','mail-settings':'Expeditorul folosit pentru alerte. Gmail necesită OAuth sau o metodă acceptată de Google.','senior-card-colors':'Culorile fiecărui beneficiar afișat pe ecran și numărul de carduri vizibile pe dispozitiv.','senior-sound-settings':'Setările de sunet și volum pentru alarmele de pe ecranul Senior.','alert-rules':'Condițiile care declanșează alerte și escaladări.','notification-channels':'Configurare tehnică avansată a canalelor.','task-types':'Categoriile de activități și tratamente.','mail-center':'Conturi tehnice de mesagerie.','subscription-plans':'Planul activ, prețul și limitele aplicate în aplicație.','info':'Informații tehnice și administrative.'}; document.getElementById('cfgDesc').textContent=descriptions[section]||'Gestionezi '+names[section].toLowerCase()+'.'; document.getElementById('dbError').innerHTML=''; try{if(section==='access-accounts'){rows=(await api('/api/admin/access-accounts?ts='+Date.now())).map(x=>({id:x.id,payload:{'Persoană':x.name,'Utilizator':x.username,'Rol':x.role,'Parolă':x.password_configured?'Configurată':'Lipsă','PIN':x.pin_enabled?'Activ':'Inactiv'},access:x}));}
+ else if(section==='senior-card-colors'){const entities=await api('/api/entities');seniorChoices=entities.filter(e=>e&&e.entity_code);}
+    if(section==='branches'||section==='care-persons'){try{const hd=await api('/api/config/care-header?ts='+Date.now());headerChoices=(hd||[]).map(x=>({id:x.id,name:(x.payload&&x.payload['Denumire'])||''})).filter(x=>x.name);}catch(_){headerChoices=[];}} if(section==='care-persons'){try{const br=await api('/api/config/branches?ts='+Date.now());branchChoices=(br||[]).map(x=>({id:x.id,name:(x.payload&&x.payload['Denumire ramificație'])||'',header:(x.payload&&x.payload['Organizație / cont'])||''})).filter(x=>x.name);}catch(_){branchChoices=[];}} if(section==='mail-settings'){const cfg=await api('/api/mail-settings');rows=cfg.configured?[{id:'secure-mail',payload:{Email:cfg.email,'Parolă':cfg.passwordConfigured?'configurată':'',Activ:cfg.active,Criptare:cfg.encrypted?'AES-256-GCM':'necesită resalvare'}}]:[];}else rows=await api('/api/config/'+section);}catch(e){rows=[]; document.getElementById('dbError').innerHTML='<div class="error-box">Nu pot încărca datele: '+safe(e.message)+'</div>';} render(); await renderConfigEnhancements(section);}
+function render(){
+ const cols=meta[current]; const thead=document.querySelector('#cfgTable thead'); const tbody=document.querySelector('#cfgTable tbody');
+ if(current==='access-accounts'){
+  thead.innerHTML='';
+  if(!rows.length){tbody.innerHTML='<tr><td class="muted">Nu există conturi în rețeaua curentă. Creează mai întâi un beneficiar sau un membru cu acces.</td></tr>';return;}
+  tbody.innerHTML='<tr><td><div class="access-grid">'+rows.map(r=>{const a=r.access||{};const pin=a.pin_enabled?'<span class="status-chip ok">PIN activ</span>':'<span class="status-chip">PIN inactiv</span>';const pwd=a.password_configured?'<span class="status-chip ok">Parolă configurată</span>':'<span class="status-chip warn">Fără parolă</span>';return '<article class="access-card"><div class="access-card-head"><div class="access-avatar">'+safe((r.payload.Persoană||'U').slice(0,1).toUpperCase())+'</div><div><h3>'+safe(r.payload.Persoană||r.payload.Utilizator)+'</h3><p>'+safe(r.payload.Rol||'membru')+' · '+safe(r.payload.Utilizator||'fără utilizator')+'</p></div></div><div class="access-status">'+pwd+pin+'</div><div class="access-contact">'+(a.phone?'<span>📞 '+safe(a.phone)+'</span>':'')+(a.email?'<span>✉️ '+safe(a.email)+'</span>':'')+'</div><div class="access-actions"><button class="btn primary" type="button" onclick="openAccess('+r.id+')">Administrează accesul</button>'+(a.pin_enabled?'<button class="btn danger" type="button" onclick="removePin('+r.id+')">Șterge PIN</button>':'')+'</div></article>'}).join('')+'</div></td></tr>';
+  return;
+ }
+ thead.innerHTML='<tr>'+cols.map(c=>'<th>'+safe(fieldLabel(current,c))+'</th>').join('')+'<th>Acțiuni</th></tr>';
+ if(!rows.length){tbody.innerHTML='<tr><td colspan="'+(cols.length+1)+'" class="muted">Nu există înregistrări. Apasă Adaugă pentru prima înregistrare.</td></tr>';return;}
+ tbody.innerHTML=rows.map(r=>{const p=r.payload||{}; return '<tr>'+cols.map(c=>'<td data-label="'+safe(fieldLabel(current,c))+'">'+safe((current==='mail-settings' && c==='Parolă' && p[c])?'••••••••':(p[c]||''))+'</td>').join('')+'<td class="actions" data-label="Acțiuni"><button class="btn action-small" onclick="openEdit('+r.id+')">Modifică</button><button class="btn danger action-small" onclick="delRow('+r.id+')">Șterge</button></td></tr>';}).join('');
+}
+function openModal(row){clearModalMessage();document.getElementById('saveBtn').textContent='Salvează';editId=row?.id||null; document.getElementById('modalTitle').textContent=editId?'Modifică '+names[current]:'Adaugă '+names[current]; const cols=meta[current]; const p=row?.payload||{}; document.getElementById('cfgForm').innerHTML=cols.map(c=>{
+  if((current==='branches'||current==='care-persons')&&c==='Organizație / cont'){const selected=String(p[c]||'');const options=headerChoices.map(h=>'<option value="'+safe(h.name)+'" '+(String(h.name)===selected?'selected':'')+'>'+safe(h.name)+'</option>').join('');return '<div class="field"><label>Organizație / cont</label><select name="Organizație / cont"><option value="">Organizația implicită</option>'+options+'</select><small class="muted">Aici alegi dacă beneficiarul sau grupul ține de Familie, Rețeaua Camil, cămin etc.</small></div>';}
+  if(current==='senior-card-colors'&&c==='Cod entitate'){const selected=String(p[c]||'');const options=seniorChoices.map(e=>'<option value="'+safe(e.entity_code)+'" '+(String(e.entity_code)===selected?'selected':'')+'>'+safe(e.name)+' ('+safe(e.entity_code)+')</option>').join('');return '<div class="field"><label>Senior</label><select name="Cod entitate" required><option value="">Alege seniorul</option>'+options+'</select></div>';}
+  if(current==='care-persons'&&c==='Ramificație'){const selected=String(p[c]||'');const options=branchChoices.map(b=>'<option value="'+safe(b.name)+'" '+(String(b.name)===selected?'selected':'')+'>'+safe(b.name)+(b.header?' · '+safe(b.header):'')+'</option>').join('');return '<div class="field"><label>Grup / locație</label><select name="Ramificație"><option value="">Fără unitate</option>'+options+'</select><small class="muted">Beneficiarul va apărea în filtre, rapoarte și asignarea taskurilor pentru acest grup.</small></div>';}
+  if(current==='senior-sound-settings'&&c==='Tip sunet'){const selected=String(p[c]||'soft');return '<div class="field"><label>Tip sunet</label><select name="Tip sunet"><option value="soft" '+(selected==='soft'?'selected':'')+'>Sunet blând</option><option value="bell" '+(selected==='bell'?'selected':'')+'>Clopoțel</option><option value="alert" '+(selected==='alert'?'selected':'')+'>Alertă</option></select><small class="muted">Se aplică pe ecranul Senior la următoarea încărcare.</small></div>';}
+  if(current==='senior-sound-settings'&&c==='Volum'){return '<div class="field"><label>Volum</label><input type="number" min="0" max="100" name="Volum" value="'+safe(p[c]||'70')+'"><small class="muted">Valoare între 0 și 100.</small></div>';}
+  if(current==='senior-sound-settings'&&c==='Activ'){const selected=String(p[c]||'da');return '<div class="field"><label>Activ</label><select name="Activ"><option value="da" '+(selected==='da'?'selected':'')+'>Da</option><option value="nu" '+(selected==='nu'?'selected':'')+'>Nu</option></select></div>';}
+  const isColor=c.toLowerCase().includes('culoare');
+  const type = isColor ? 'color' : (c.toLowerCase().includes('parol') ? 'password' : (c.toLowerCase().includes('email') ? 'email' : 'text'));
+  const defaultValue=c==='Culoare fundal'?'#2563EB':(c==='Culoare text'?'#FFFFFF':'');
+  const hint = current==='mail-settings' && c==='Parolă' ? '<small class="muted">Lasă gol la modificare pentru a păstra secretul existent. Pentru salvare securizată, serverul trebuie să aibă MAIL_SECRET_KEY.</small>' : (isColor?'<small class="muted">Apasă pe pătratul colorat pentru a alege vizual culoarea.</small>':'');
+  return '<div class="field"><label>'+safe(fieldLabel(current,c))+'</label><input type="'+type+'" name="'+safe(c)+'" value="'+safe(current==='mail-settings'&&c==='Parolă'?'':(p[c]||defaultValue))+'">'+hint+'</div>';
+}).join('')+(current==='care-persons'?'<div class="field"><label>Utilizator beneficiar Senior</label><input type="text" name="Utilizator senior" autocomplete="off" value="'+safe(p['Utilizator senior']||'')+'"><small class="muted">Cont pentru intrarea beneficiarului în ecranul Senior. Acest cont vede doar beneficiarul curent.</small></div><div class="field"><label>Parolă senior</label><input type="password" name="Parolă senior" autocomplete="new-password" value=""><small class="muted">La adăugare este obligatorie dacă setezi login. La modificare completeaz-o doar dacă vrei să schimbi parola.</small></div><div class="field"><label>Telefon senior/login</label><input type="tel" name="Telefon senior" inputmode="tel" autocomplete="off" value="'+safe(p['Telefon senior']||'')+'"><small class="muted">Telefonul poate fi folosit și ca login pentru acest beneficiar.</small></div><div class="field"><label>Aparținător / organizație</label><input type="text" name="Aparținător" value="'+safe(p['Aparținător']||p['Organizație / cont']||'')+'" readonly><small class="muted">Legătura se face prin organizația și grupul alese mai sus.</small></div><div class="field"><label>Telefon contact familie 1</label><input type="tel" name="Telefon contact familie 1" inputmode="tel" autocomplete="off" value="'+safe(p['Telefon contact familie 1']||'')+'"><small class="muted">Acesta apare primul la „Sună familia” în Senior.</small></div><div class="field"><label>Telefon contact familie 2</label><input type="tel" name="Telefon contact familie 2" inputmode="tel" autocomplete="off" value="'+safe(p['Telefon contact familie 2']||'')+'"></div><div class="field"><label>Telefon contact familie 3</label><input type="tel" name="Telefon contact familie 3" inputmode="tel" autocomplete="off" value="'+safe(p['Telefon contact familie 3']||'')+'"></div>':''); document.getElementById('modal').classList.add('show');}
+function openAccess(id){
+ const row=rows.find(r=>r.id===id); if(!row)return; clearModalMessage(); editId=id;
+ const who=row.payload['Persoană']||row.payload['Utilizator'];
+ document.getElementById('modalTitle').textContent='Acces pentru '+who;
+ document.getElementById('cfgForm').innerHTML='<div class="access-help"><b>Alege ce dorești să modifici</b><p>Parola și PIN-ul pot rămâne active simultan. PIN-ul este recomandat seniorilor, dar trebuie să fie greu de ghicit.</p></div><div class="field"><label>Parolă nouă</label><div class="secret-row"><input id="newAccessPassword" type="password" name="Noua parolă" autocomplete="new-password" minlength="8"><button class="btn" type="button" onclick="toggleSecret(&quot;newAccessPassword&quot;,this)">Arată</button></div><small class="muted">Minimum 8 caractere. Lasă gol dacă modifici numai PIN-ul.</small></div><div class="field"><label>Confirmă parola</label><input type="password" name="Confirmă parola" autocomplete="new-password" minlength="8"></div><div class="field"><label>PIN nou</label><input type="password" name="PIN" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="new-password" placeholder="4 cifre"><small class="muted">Nu folosi 0000, 1111, 1234, 4321 sau anul nașterii.</small></div><div class="field"><label>Confirmă PIN-ul</label><input type="password" name="Confirmă PIN" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" autocomplete="new-password"></div><div class="field field-wide"><label class="switch-label"><input type="checkbox" name="PIN activ" value="da" '+(row.access?.pin_enabled?'checked':'')+'><span>Permite autentificarea cu PIN</span></label><small class="muted">Parola normală rămâne disponibilă. Dezactivează PIN-ul dacă dispozitivul este folosit și de alte persoane.</small></div>';
+ document.getElementById('saveBtn').textContent='Salvează accesul';
+ document.getElementById('modal').classList.add('show');
+}
+function toggleSecret(id,btn){const el=document.getElementById(id);if(!el)return;el.type=el.type==='password'?'text':'password';btn.textContent=el.type==='password'?'Arată':'Ascunde';}
+async function removePin(id){if(!(await appConfirm('Ștergi PIN-ul acestei persoane? Parola va rămâne activă.')))return;try{await api('/api/admin/access-accounts/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({clearPin:true,pinEnabled:false})});appNotice('PIN-ul a fost șters.','success');await load('access-accounts');}catch(e){appNotice('PIN-ul nu a putut fi șters: '+e.message,'error');}}
+function openEdit(id){openModal(rows.find(r=>r.id===id));}
+async function delRow(id){if(!(await appConfirm('Ștergi înregistrarea?'))) return; try{if(current==='mail-settings')await api('/api/mail-settings',{method:'DELETE'});else await api('/api/config/'+current+'/'+id,{method:'DELETE'}); await load(current); appNotice('Înregistrarea a fost ștearsă.','success');}catch(e){appNotice('Eroare ștergere: '+e.message,'error');}}
+async function saveRow(){clearModalMessage();const fd=new FormData(document.getElementById('cfgForm')); const payload={}; for(const [k,v] of fd.entries()) payload[k]=v; try{ if(current==='access-accounts'){const password=String(payload['Noua parolă']||'');const pin=String(payload.PIN||'');if(password!==String(payload['Confirmă parola']||''))throw new Error('Parolele introduse nu coincid.');if(pin!==String(payload['Confirmă PIN']||''))throw new Error('PIN-urile introduse nu coincid.');await api('/api/admin/access-accounts/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,pin,pinEnabled:payload['PIN activ']==='da'})});}else if(current==='mail-settings'){await api('/api/mail-settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:payload.Email,password:payload['Parolă'],active:String(payload.Activ||'da').toLowerCase()!=='nu'})});}else if(editId) await api('/api/config/'+current+'/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); else await api('/api/config/'+current,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); document.getElementById('modal').classList.remove('show'); appNotice('Datele au fost salvate.','success'); await load(current);}catch(e){modalMessage('Eroare salvare: '+e.message,'error');}}
+const ADVANCED_SECTIONS=new Set(['entity-types','notification-channels','mail-center','info']);
+function setAdminMode(advanced){
+ document.querySelectorAll('.advanced-option').forEach(el=>el.hidden=!advanced);
+ document.querySelectorAll('[data-mode="advanced"]').forEach(el=>el.hidden=!advanced);
+ document.getElementById('simpleMode')?.classList.toggle('primary',!advanced);
+ document.getElementById('advancedMode')?.classList.toggle('primary',advanced);
+ const status=document.getElementById('modeStatus');if(status)status.textContent=advanced?'Mod avansat activ — sunt afișate și opțiunile tehnice.':'Mod uzual activ — sunt afișate doar opțiunile recomandate.';
+ localStorage.setItem('familycare-admin-advanced',advanced?'1':'0');
+ if(!advanced&&ADVANCED_SECTIONS.has(current))load('care-header');
+}
+document.getElementById('simpleMode')?.addEventListener('click',()=>setAdminMode(false));
+document.getElementById('advancedMode')?.addEventListener('click',()=>setAdminMode(true));
+setAdminMode(localStorage.getItem('familycare-admin-advanced')==='1');
+document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>load(b.dataset.section)); document.getElementById('configSectionSelect').onchange=e=>load(e.target.value); document.getElementById('addBtn').onclick=()=>openModal(); document.getElementById('closeModal').onclick=()=>{clearModalMessage();document.getElementById('modal').classList.remove('show');}; document.getElementById('cancelBtn').onclick=()=>{clearModalMessage();document.getElementById('modal').classList.remove('show');}; document.getElementById('saveBtn').onclick=saveRow; const requestedSection=new URLSearchParams(location.search).get('section');load(meta[requestedSection]?requestedSection:current);
+</script>
+
+<script>
+(function(){
+ const key='familycare-menu-collapsed';
+ const shell=document.querySelector('.app-shell');
+ const btn=document.getElementById('menuToggle');
+ function apply(v){ if(shell) shell.classList.toggle('menu-collapsed', v==='1'); if(btn) btn.textContent=v==='1'?'☰':'☰'; }
+ apply(window.innerWidth<=1000?(localStorage.getItem(key)||'1'):'0');
+ if(btn) btn.addEventListener('click',()=>{ const next=shell&&shell.classList.contains('menu-collapsed')?'0':'1'; localStorage.setItem(key,next); apply(next); });
+})();
+</script>
+</body>
+</html>

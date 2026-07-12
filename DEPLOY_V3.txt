@@ -1,0 +1,7 @@
+FamilyCare Main v3.0.0
+
+1. Replace all files in the corresponding GitHub repository.
+2. Commit and push.
+3. In Render: Manual Deploy > Clear build cache & deploy.
+4. After deployment, open the site once with Ctrl+Shift+R.
+5. The service worker cache name is v3.0.0, so older PWA assets are removed automatically.

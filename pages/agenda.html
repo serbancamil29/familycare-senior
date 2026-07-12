@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <script>
+(function(){
+  try {
+    if (localStorage.getItem('familycare-theme') === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+    }
+  } catch (e) {}
+})();
+</script>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Agendă - FamilyCare</title>
+ <link rel="stylesheet" href="../styles/common.css?v=3.0.0">
+ <link rel="stylesheet" href="../styles/agenda.css?v=3.0.0">
+</head>
+<body>
+<div class="app-shell">
+ <aside class="sidebar">
+  <a class="brand" href="dashboard.html">
+   <img src="../assets/logo.svg" alt="FamilyCare logo">
+   <div><div class="brand-title">FamilyCare</div><div class="brand-subtitle">by Cademix</div><div class="brand-version">v3.0.0</div></div>
+  </a>
+  <button class="menu-toggle" type="button" id="menuToggle" title="Restrânge meniul">☰</button>
+  <nav class="nav"><a class="" href="dashboard.html"><span class="ico">🏠</span><span>Dashboard</span></a>
+<a class="" href="journal.html"><span class="ico">📝</span><span>Jurnal</span></a>
+<a class="active" href="agenda.html"><span class="ico">📅</span><span>Agenda</span></a>
+<a class="" href="reports.html"><span class="ico">▦</span><span>Rapoarte</span></a>
+<a class="" href="config.html"><span class="ico">⚙️</span><span>Configurări</span></a>
+<a class="" href="compliance.html"><span class="ico">✓</span><span>Conformitate</span></a>
+<a class="" href="#senior" data-senior-link target="_blank" rel="noopener"><span class="ico">👤</span><span>Ecran Senior</span></a></nav>
+  <div class="theme-switch" aria-label="Teme"><button class="btn-light" type="button" data-theme="light">Light</button><button class="btn-dark" type="button" data-theme="dark">Dark</button></div>
+ </aside>
+ <main class="main">
+  <div class="topbar">
+   <div>
+    <div class="eyebrow">FamilyCare by Cademix</div>
+    <h1 class="page-title">Agendă</h1>
+    <div class="now-chip" id="nowInfo">Azi · --:--</div>
+   </div>
+   <div class="context-card">
+    <div class="context-row"><div><span class="muted">Care Header ID</span><br><b>CH-RO-0001</b></div><span class="pill">Familie proprie</span></div>
+    <div class="context-selects"><select><option>Părinții mei</option><option>Familia mea</option><option>Părinții soției</option><option>Cămin seniori</option></select><select><option>Maria Popescu · senioră</option><option>Ion Popescu · senior</option><option>Ana Popescu · copil</option><option>Casa din Iași · locuință</option><option>Rex · animal de companie</option><option>Mașina tatălui · vehicul</option></select></div>
+   </div>
+  </div>
+  <section class="card">
+   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap">
+    <div>
+     <h2 class="section-title">Calendar săptămânal</h2>
+     
+    </div>
+    <button class="btn primary" type="button">Adaugă task în agendă</button>
+   </div>
+   <div class="week-strip" id="agendaDays" style="margin-top:18px">
+    <button class="day-card active" data-day="luni"><span>Luni</span><b>Vizită</b><em class="mini-count">3 evenimente</em></button>
+    <button class="day-card" data-day="marti"><span>Marți</span><b>Control</b><em class="mini-count">2 evenimente</em></button>
+    <button class="day-card" data-day="miercuri"><span>Miercuri</span><b>Tratament</b><em class="mini-count">4 evenimente</em></button>
+    <button class="day-card" data-day="joi"><span>Joi</span><b>Cumpărături</b><em class="mini-count">2 evenimente</em></button>
+    <button class="day-card" data-day="vineri"><span>Vineri</span><b>Jurnal</b><em class="mini-count">3 evenimente</em></button>
+    <button class="day-card" data-day="sambata"><span>Sâmbătă</span><b>Familie</b><em class="mini-count">2 evenimente</em></button>
+    <button class="day-card" data-day="duminica"><span>Duminică</span><b>Apel</b><em class="mini-count">1 eveniment</em></button>
+   </div>
+  </section>
+  <section class="section card panel-fade" id="dayDetails">
+   <h2 class="section-title" id="dayTitle">Luni · activități planificate</h2>
+   <div class="timeline-list" id="dayTimeline"></div>
+  </section>
+  <section class="section grid-2">
+   <div class="card">
+    <h2 class="section-title">Task recurent nou</h2>
+    
+    <div class="form-grid">
+     <div class="field"><label>Denumire task</label><input value="Vizită îngrijitor"></div>
+     <div class="field"><label>Tip task</label><select><option>Vizită</option><option>Tratament</option><option>Control</option><option>Cumpărături</option><option>Apel</option><option>Alt task</option></select></div>
+     <div class="field"><label>Începe la</label><input type="date" value="2026-07-01"></div>
+     <div class="field"><label>Până la</label><input type="date" value="2026-12-31"></div>
+     <div class="field"><label>Ora</label><input type="time" value="09:00"></div>
+     <div class="field"><label>Se repetă</label><select><option>Zile selectate</option><option>Zilnic</option><option>Din X în X zile</option><option>Săptămânal</option><option>O singură dată</option></select></div>
+     <div class="field"><label>Interval la X zile</label><input type="number" value="2" min="1"></div>
+     <div class="field"><label>Escaladare după minute</label><input type="number" value="30" min="0"></div>
+     <div class="field full"><label>Zile active</label><div class="checkbox-row"><label class="check-pill"><input type="checkbox">Luni</label><label class="check-pill"><input type="checkbox">Marți</label><label class="check-pill"><input type="checkbox">Miercuri</label><label class="check-pill"><input type="checkbox">Joi</label><label class="check-pill"><input type="checkbox">Vineri</label><label class="check-pill"><input type="checkbox">Sâmbătă</label><label class="check-pill"><input type="checkbox">Duminică</label></div></div>
+    </div>
+   </div>
+   <div class="card">
+    <h2 class="section-title">Notificări email</h2>
+    
+    <div class="email-options">
+     <label class="check-pill"><input type="checkbox">La adăugare</label>
+     <label class="check-pill"><input type="checkbox">La finalizare</label>
+     <label class="check-pill"><input type="checkbox">La întârziere</label>
+    </div>
+    <div class="field" style="margin-top:14px"><label>Destinatari</label><input value="ioana@example.com; andrei@example.com"></div>
+    <div class="email-preview"><b>Preview email:</b><br>Task nou: Vizită îngrijitor<br>Persoană/entitate: Maria Popescu<br>Repetare: zile selectate<br>Interval: 01.07.2026 - 31.12.2026</div>
+   </div>
+  </section>
+ </main>
+</div>
+<script>
+(function(){
+ const KEY = 'familycare-theme';
+ const saved = localStorage.getItem(KEY) || 'light';
+ const apply = (theme) => {
+  document.documentElement.classList.toggle('dark-theme', theme === 'dark');
+  document.body.classList.toggle('dark-theme', theme === 'dark');
+  localStorage.setItem(KEY, theme);
+  document.querySelectorAll('[data-theme]').forEach(btn => {
+   btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+ };
+ apply(saved === 'dark' ? 'dark' : 'light');
+ document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => apply(btn.dataset.theme));
+ });
+})();
+</script>
+
+
+
+<script>
+(function(){
+ function pad(n){return String(n).padStart(2,'0')}
+ function jsWeekday(d){const n=d.getDay();return n===0?7:n}
+ const names={1:'Luni',2:'Marți',3:'Miercuri',4:'Joi',5:'Vineri',6:'Sâmbătă',7:'Duminică'};
+ function todayIso(){const d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+ function plusMonths(m){const d=new Date();d.setMonth(d.getMonth()+m);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+ function timeNow(){const d=new Date();d.setMinutes(Math.ceil(d.getMinutes()/5)*5,0,0);return pad(d.getHours())+':'+pad(d.getMinutes())}
+ function updateNow(){const d=new Date();const el=document.getElementById('nowInfo');if(el)el.innerHTML='Azi <b>'+names[jsWeekday(d)]+', '+d.toLocaleDateString('ro-RO')+' · '+pad(d.getHours())+':'+pad(d.getMinutes())+'</b>'}
+ function applyDefaults(){document.querySelectorAll('input[type="date"]').forEach((x,i)=>{if(i===0)x.value=todayIso();else x.value=plusMonths(6)}); const t=document.querySelector('input[type="time"]'); if(t)t.value=timeNow(); const today=names[jsWeekday(new Date())]; document.querySelectorAll('#agendaDays .day-card').forEach(c=>{if(c.querySelector('span')&&c.querySelector('span').textContent.trim()===today){document.querySelectorAll('#agendaDays .day-card').forEach(x=>x.classList.remove('active'));c.classList.add('active')}}); updateNow(); setInterval(updateNow,30000)}
+ applyDefaults();
+})();
+</script>
+
+<script>
+const agendaData={
+ luni:[['09:00','Tratament','Pastila de tensiune · confirmare necesară'],['11:00','Vizită','Vine îngrijitorul Mihai'],['18:00','Apel','Sună familia']],
+ marti:[['08:30','Jurnal','Notă stare generală'],['12:00','Control','Programare medic familie']],
+ miercuri:[['09:00','Tratament','Pastila de tensiune'],['10:00','Cumpărături','Listă alimente'],['14:00','Farmacie','Ridicare medicamente'],['20:00','Tratament','Tratament seară']],
+ joi:[['09:00','Tratament','Pastila de tensiune'],['17:00','Cumpărături','Livrare mâncare']],
+ vineri:[['09:00','Tratament','Pastila tensiune'],['13:00','Jurnal','Observație dispoziție'],['18:30','Apel','Apel video familie']],
+ sambata:[['10:00','Familie','Vizită Ioana'],['16:00','Plimbare','Activitate ușoară']],
+ duminica:[['18:00','Apel','Sună familia']]
+};
+const dayNames={luni:'Luni',marti:'Marți',miercuri:'Miercuri',joi:'Joi',vineri:'Vineri',sambata:'Sâmbătă',duminica:'Duminică'};
+function targetFor(type){const map={Tratament:'treatment.html',Vizită:'agenda.html',Apel:'agenda.html',Jurnal:'journal.html',Control:'recommendations.html',Cumpărături:'agenda.html',Farmacie:'mail-center.html',Familie:'agenda.html',Plimbare:'agenda.html'};return map[type]||'agenda.html';}
+function renderDay(day){
+ document.querySelectorAll('#agendaDays .day-card').forEach(b=>b.classList.toggle('active',b.dataset.day===day));
+ document.getElementById('dayTitle').textContent=dayNames[day]+' · activități';
+ document.getElementById('dayTimeline').innerHTML=agendaData[day].map(x=>`<div class="timeline-item"><div class="time-badge">${x[0]}</div><div><b><span class="status-dot"></span>${x[1]}</b><br><span class="muted">${x[2]}</span></div><a class="btn" href="${targetFor(x[1])}">Deschide</a></div>`).join('');
+}
+document.querySelectorAll('#agendaDays .day-card').forEach(b=>b.addEventListener('click',()=>renderDay(b.dataset.day)));renderDay('luni');
+</script>
+
+<script>
+(function(){
+ const key='familycare-menu-collapsed';
+ const shell=document.querySelector('.app-shell');
+ const btn=document.getElementById('menuToggle');
+ function apply(v){ if(shell) shell.classList.toggle('menu-collapsed', v==='1'); if(btn) btn.textContent=v==='1'?'☰':'☰'; }
+ apply(window.innerWidth<=1000?(localStorage.getItem(key)||'1'):'0');
+ if(btn) btn.addEventListener('click',()=>{ const next=shell&&shell.classList.contains('menu-collapsed')?'0':'1'; localStorage.setItem(key,next); apply(next); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ro">
+<head>
+ <script>
+(function(){
+  try {
+    if (localStorage.getItem('familycare-theme') === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+    }
+  } catch (e) {}
+})();
+</script>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#2563EB"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+ <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
+ <title>Mail Center - FamilyCare</title>
+ <link rel="stylesheet" href="../styles/common.css?v=3.0.0">
+ <link rel="stylesheet" href="../styles/mail-center.css?v=3.0.0">
+</head>
+<body>
+<div class="app-shell">
+ <aside class="sidebar">
+  <a class="brand" href="dashboard.html">
+   <img src="../assets/logo.svg" alt="FamilyCare logo">
+   <div><div class="brand-title">FamilyCare</div><div class="brand-subtitle">by Cademix</div><div class="brand-version">v3.0.0</div></div>
+  </a>
+  <button class="menu-toggle" type="button" id="menuToggle" title="Restrânge meniul">☰</button>
+  <nav class="nav"><a class="" href="dashboard.html"><span class="ico">🏠</span><span>Dashboard</span></a>
+<a class="" href="journal.html"><span class="ico">📝</span><span>Jurnal</span></a>
+<a class="" href="agenda.html"><span class="ico">📅</span><span>Agenda</span></a>
+<a class="" href="reports.html"><span class="ico">▦</span><span>Rapoarte</span></a>
+<a class="" href="config.html"><span class="ico">⚙️</span><span>Configurări</span></a>
+<a class="" href="compliance.html"><span class="ico">✓</span><span>Conformitate</span></a>
+<a class="" href="#senior" data-senior-link target="_blank" rel="noopener"><span class="ico">👤</span><span>Ecran Senior</span></a></nav>
+  <div class="theme-switch" aria-label="Teme"><button class="btn-light" type="button" data-theme="light">Light</button><button class="btn-dark" type="button" data-theme="dark">Dark</button></div>
+ </aside>
+ <main class="main">
+  <div class="topbar">
+   <div>
+    <div class="eyebrow">FamilyCare by Cademix</div>
+    <h1 class="page-title">Mail Center</h1>
+    <p class="page-lead">Zonă multifunctională pentru preluare emailuri, analiză read-only și transformare în taskuri propuse.</p>
+   </div>
+   <div class="context-card">
+    <div class="context-row"><div><span class="muted">Care Header ID</span><br><b>CH-RO-0001</b></div><span class="pill">Familie proprie</span></div>
+    <div class="context-selects"><select><option>Părinții mei</option><option>Familia mea</option><option>Părinții soției</option><option>Cămin seniori</option></select><select><option>Maria Popescu · senioră</option><option>Ion Popescu · senior</option><option>Ana Popescu · copil</option><option>Casa din Iași · locuință</option><option>Rex · animal de companie</option><option>Mașina tatălui · vehicul</option></select></div>
+   </div>
+  </div>
+  <section class="grid-3"><button class="card metric seg-source" data-panel="inbox"><span class="label">Emailuri preluate</span><div class="value">6</div><span class="hint">read-only demo</span></button><button class="card metric seg-source" data-panel="suggestions"><span class="label">Sugestii AI</span><div class="value">3</div><span class="hint">taskuri propuse</span></button><button class="card metric seg-source" data-panel="accounts"><span class="label">Surse</span><div class="value">4</div><span class="hint">medic/farmacie/furnizor</span></button></section>
+  <section class="section card"><h2 class="section-title">Mail Center</h2><div class="seg-tabs"><button class="seg-tab active" data-tab="inbox">Inbox</button><button class="seg-tab" data-tab="suggestions">Sugestii task</button><button class="seg-tab" data-tab="accounts">Conturi read-only</button><button class="seg-tab" data-tab="history">Istoric</button></div>
+   <div class="tab-panel active panel-fade" id="inbox"><div class="grid-2" style="margin-top:16px"><div class="mail-item card soft"><div class="mail-meta">De la: cabinet@example.com · azi 08:30</div><b>Control cardiologie recomandat</b><p>Vă rugăm programați control în următoarele 30 de zile.</p><button class="btn primary">Vezi sugestie task</button></div><div class="mail-item card soft"><div class="mail-meta">De la: farmacie@example.com · ieri 16:10</div><b>Medicamente disponibile</b><p>Comanda este pregătită pentru ridicare/livrare.</p><button class="btn primary">Vezi sugestie task</button></div></div></div>
+   <div class="tab-panel panel-fade" id="suggestions"><div class="timeline-list" style="margin-top:16px"><div class="timeline-item"><div class="time-badge">AI</div><div><b>Programare control cardiologie</b><br><span class="muted">Termen sugerat: 30 zile · sursă: email medic.</span></div><button class="btn primary">Transformă în task</button></div><div class="timeline-item"><div class="time-badge">AI</div><div><b>Ridicare medicamente</b><br><span class="muted">Sursă: email farmacie.</span></div><button class="btn primary">Transformă în task</button></div></div></div>
+   <div class="tab-panel panel-fade" id="accounts"><div class="table-wrap" style="margin-top:16px"><table><tr><th>Sursă</th><th>Status</th><th>Rol</th><th>Mod</th></tr><tr><td>Medic familie</td><td>conectare viitoare</td><td>recomandări</td><td>read-only</td></tr><tr><td>Farmacie</td><td>conectare viitoare</td><td>livrări</td><td>read-only</td></tr><tr><td>Îngrijitor</td><td>conectare viitoare</td><td>confirmări</td><td>read-only</td></tr></table></div></div>
+   <div class="tab-panel panel-fade" id="history"><div class="timeline-list" style="margin-top:16px"><div class="timeline-item"><div class="time-badge">Azi</div><div><b>Email analizat</b><br><span class="muted">Control cardiologie recomandat → sugestie creată.</span></div><span class="pill">read-only</span></div></div></div>
+  </section>
+ </main>
+</div>
+<script>
+(function(){
+ const KEY = 'familycare-theme';
+ const saved = localStorage.getItem(KEY) || 'light';
+ const apply = (theme) => {
+  document.documentElement.classList.toggle('dark-theme', theme === 'dark');
+  document.body.classList.toggle('dark-theme', theme === 'dark');
+  localStorage.setItem(KEY, theme);
+  document.querySelectorAll('[data-theme]').forEach(btn => {
+   btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+ };
+ apply(saved === 'dark' ? 'dark' : 'light');
+ document.querySelectorAll('[data-theme]').forEach(btn => {
+  btn.addEventListener('click', () => apply(btn.dataset.theme));
+ });
+})();
+</script>
+
+
+<script>
+function activateTab(name){document.querySelectorAll('.seg-tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===name));document.querySelectorAll('.seg-source').forEach(b=>b.classList.toggle('active',b.dataset.panel===name));document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active',p.id===name));}
+document.querySelectorAll('.seg-tab').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));document.querySelectorAll('.seg-source').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.panel)));
+</script>
+
+<script>
+(function(){
+ const key='familycare-menu-collapsed';
+ const shell=document.querySelector('.app-shell');
+ const btn=document.getElementById('menuToggle');
+ function apply(v){ if(shell) shell.classList.toggle('menu-collapsed', v==='1'); if(btn) btn.textContent=v==='1'?'☰':'☰'; }
+ apply(window.innerWidth<=1000?(localStorage.getItem(key)||'1'):'0');
+ if(btn) btn.addEventListener('click',()=>{ const next=shell&&shell.classList.contains('menu-collapsed')?'0':'1'; localStorage.setItem(key,next); apply(next); });
+})();
+</script>
+</body>
+</html>
