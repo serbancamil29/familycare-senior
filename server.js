@@ -305,8 +305,22 @@ async function handleNetworkAccessApi(req,res,url){
     }
     if(url.pathname==='/api/network/request-activation'&&req.method==='POST'){
       const b=await readJson(req), phone=normalizePhone(b.phone||''), code=String(b.beneficiaryCode||'').trim().toUpperCase();
-      const out=await runPsql(`select coalesce((select json_build_object('name',payload->>'Nume','phone',payload->>'Telefon','headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','pinActive',coalesce((payload->>'PinActiv')::boolean,false))::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-access' and coalesce((payload->>'Activ')::boolean,true)=true and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} and ${phoneSqlCanonical("payload->>'Telefon'")}=${dollar(phone)} order by id desc limit 1),'{}');`);
-      const access=JSON.parse(out||'{}'); if(!access.name)throw new Error('Telefonul și codul beneficiarului nu corespund.');
+      if(!phone||!code)throw new Error('Completează telefonul și codul beneficiarului.');
+      const out=await runPsql(`select coalesce((select json_build_object('name',payload->>'Nume','phone',${phoneSqlCanonical("payload->>'Telefon'")},'headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','pinActive',coalesce((payload->>'PinActiv')::boolean,false))::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-access' and coalesce((payload->>'Activ')::boolean,true)=true and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} order by id desc limit 1),'{}');`);
+      const access=JSON.parse(out||'{}');
+      if(!access.name)throw new Error('Codul beneficiarului nu există sau beneficiarul nu mai este activ.');
+      if(String(access.phone||'')!==phone)throw new Error('Telefonul introdus nu corespunde beneficiarului. Verifică numărul din profilul beneficiarului.');
+      if(access.pinActive)throw new Error('Contul este deja activ. Folosește utilizatorul și PIN-ul pentru autentificare.');
+
+      // Păstrăm o singură cerere deschisă pentru fiecare beneficiar.
+      await runPsql(`with ranked as (select id,row_number() over(order by id desc) rn from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} and payload->>'HeaderCode'=${dollar(access.headerCode||'')} and payload->>'Status' in ('pending','approved')) update ${dq(PGSCHEMA)}.config_record c set payload=c.payload || jsonb_build_object('Status','superseded','InlocuitLa',${dollar(new Date().toISOString())}) from ranked r where c.id=r.id and r.rn>1;`);
+      const existingOut=await runPsql(`select coalesce((select json_build_object('requestId',payload->>'RequestId','status',payload->>'Status','expiresAt',payload->>'ActivationExpiraLa')::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} and payload->>'HeaderCode'=${dollar(access.headerCode||'')} and payload->>'Status' in ('pending','approved') order by id desc limit 1),'{}');`);
+      const existing=JSON.parse(existingOut||'{}');
+      if(existing.requestId){
+        const stillValid=existing.status==='pending'||(existing.status==='approved'&&existing.expiresAt&&new Date(existing.expiresAt).getTime()>Date.now());
+        if(stillValid){send(res,200,JSON.stringify({ok:true,requestId:existing.requestId,name:access.name,status:existing.status,reused:true}),'application/json; charset=utf-8');return true;}
+        await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=(payload || jsonb_build_object('Status','expired','ExpiratLa',${dollar(new Date().toISOString())})) - 'ActivationCodeDisplay' where section_key='beneficiary-activation-request' and payload->>'RequestId'=${dollar(existing.requestId)};`);
+      }
       const requestId=crypto.randomBytes(18).toString('hex'), now=new Date().toISOString();
       const payload=JSON.stringify({RequestId:requestId,BeneficiaryCode:code,Telefon:phone,Nume:access.name,HeaderCode:access.headerCode||'',BranchCode:access.branchCode||'',Status:'pending',SolicitatLa:now,ExpiraLa:new Date(Date.now()+24*60*60*1000).toISOString()});
       await runPsql(`insert into ${dq(PGSCHEMA)}.config_record(section_key,payload,sort_order) values ('beneficiary-activation-request',${dollar(payload)}::jsonb,10);`);
@@ -314,23 +328,25 @@ async function handleNetworkAccessApi(req,res,url){
     }
     if(url.pathname==='/api/network/verify-activation'&&req.method==='POST'){
       const b=await readJson(req), activationCode=String(b.activationCode||'').trim(), submittedPhone=normalizePhone(b.phone||''), submittedCode=String(b.beneficiaryCode||'').trim().toUpperCase(), requestId=String(b.requestId||'').trim();
+      if(!submittedPhone||!submittedCode)throw new Error('Completează telefonul și codul beneficiarului.');
       if(!/^\d{6}$/.test(activationCode))throw new Error('Codul de activare trebuie să conțină exact 6 cifre.');
-      if(!requestId)throw new Error('Cererea de activare nu mai este disponibilă. Reia activarea de la primul pas.');
 
-      const reqOut=await runPsql(`select coalesce((select json_build_object('requestId',payload->>'RequestId','beneficiaryCode',upper(coalesce(payload->>'BeneficiaryCode','')),'phone',${phoneSqlCanonical("payload->>'Telefon'")},'name',payload->>'Nume','headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','hash',payload->>'ActivationHash','salt',payload->>'ActivationSalt','iterations',coalesce((payload->>'ActivationIterations')::int,180000),'expiresAt',payload->>'ActivationExpiraLa','status',payload->>'Status')::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and payload->>'RequestId'=${dollar(requestId)} order by id desc limit 1),'{}');`);
+      // RequestId este opțional: seniorul poate relua activarea după refresh sau redeschiderea ferestrei.
+      const requestFilter=requestId?`payload->>'RequestId'=${dollar(requestId)}`:`upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(submittedCode)} and ${phoneSqlCanonical("payload->>'Telefon'")}=${dollar(submittedPhone)} and payload->>'Status'='approved'`;
+      const reqOut=await runPsql(`select coalesce((select json_build_object('requestId',payload->>'RequestId','beneficiaryCode',upper(coalesce(payload->>'BeneficiaryCode','')),'phone',${phoneSqlCanonical("payload->>'Telefon'")},'name',payload->>'Nume','headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','hash',payload->>'ActivationHash','salt',payload->>'ActivationSalt','iterations',coalesce((payload->>'ActivationIterations')::int,180000),'expiresAt',payload->>'ActivationExpiraLa','status',payload->>'Status')::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and ${requestFilter} order by id desc limit 1),'{}');`);
       const approval=JSON.parse(reqOut||'{}');
-      if(!approval.requestId)throw new Error('Cererea de activare nu a fost găsită. Reia activarea.');
+      if(!approval.requestId)throw new Error('Nu există o cerere aprobată pentru acest telefon și cod de beneficiar. Solicită activarea din nou.');
       if(approval.status!=='approved')throw new Error('Aparținătorul nu a aprobat încă activarea.');
       if(!approval.expiresAt||new Date(approval.expiresAt).getTime()<Date.now())throw new Error('Codul de activare a expirat. Solicită aparținătorului un cod nou.');
-      if(submittedCode&&submittedCode!==approval.beneficiaryCode)throw new Error('Codul beneficiarului nu corespunde cererii aprobate.');
-      if(submittedPhone&&submittedPhone!==approval.phone)throw new Error('Telefonul nu corespunde cererii aprobate.');
+      if(submittedCode!==approval.beneficiaryCode||submittedPhone!==approval.phone)throw new Error('Datele introduse nu corespund cererii aprobate.');
       const computed=passwordHash(activationCode,approval.salt||'',Number(approval.iterations||180000));
       if(!approval.hash||!sameSecret(computed,approval.hash))throw new Error('Codul de activare nu este corect.');
 
       const code=approval.beneficiaryCode, phone=approval.phone;
-      const accessOut=await runPsql(`select coalesce((select json_build_object('name',payload->>'Nume','headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','seniorUser',payload->>'SeniorUser','pinActive',coalesce((payload->>'PinActiv')::boolean,false))::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-access' and coalesce((payload->>'Activ')::boolean,true)=true and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} order by id desc limit 1),'{}');`);
+      const accessOut=await runPsql(`select coalesce((select json_build_object('name',payload->>'Nume','headerCode',payload->>'HeaderCode','branchCode',payload->>'BranchCode','seniorUser',payload->>'SeniorUser','pinActive',coalesce((payload->>'PinActiv')::boolean,false),'phone',${phoneSqlCanonical("payload->>'Telefon'")})::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-access' and coalesce((payload->>'Activ')::boolean,true)=true and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(code)} order by id desc limit 1),'{}');`);
       const state=JSON.parse(accessOut||'{}');
       if(!state.name)throw new Error('Beneficiarul nu mai este activ în rețea. Aparținătorul trebuie să verifice profilul.');
+      if(state.phone!==phone)throw new Error('Telefonul beneficiarului a fost modificat după solicitarea activării. Creează o cerere nouă.');
       if(state.pinActive)throw new Error('Contul este deja activat. Folosește utilizatorul și PIN-ul pentru autentificare.');
 
       const activationToken=crypto.randomBytes(32).toString('hex'); activationChallenges.set(activationToken,{phone,code,requestId:approval.requestId,access:{name:state.name||approval.name,headerCode:state.headerCode||approval.headerCode,branchCode:state.branchCode||approval.branchCode,seniorUser:state.seniorUser},expires:Date.now()+15*60*1000});
@@ -338,13 +354,19 @@ async function handleNetworkAccessApi(req,res,url){
     }
     if(url.pathname==='/api/network/activation-requests'&&req.method==='GET'){
       const session=getSeniorSession(req); if(!session||session.role!=='apartinator')throw new Error('Acces rezervat aparținătorului.');
-      await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=(payload || jsonb_build_object('Status','expired','ExpiratLa',${dollar(new Date().toISOString())})) - 'ActivationCodeDisplay' where section_key='beneficiary-activation-request' and payload->>'HeaderCode'=${dollar(session.headerCode)} and payload->>'Status'='approved' and nullif(payload->>'ActivationExpiraLa','') is not null and (payload->>'ActivationExpiraLa')::timestamptz < now();`);
+      const nowIso=new Date().toISOString();
+      await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=(payload || jsonb_build_object('Status','expired','ExpiratLa',${dollar(nowIso)})) - 'ActivationCodeDisplay' where section_key='beneficiary-activation-request' and payload->>'HeaderCode'=${dollar(session.headerCode)} and payload->>'Status'='approved' and nullif(payload->>'ActivationExpiraLa','') is not null and (payload->>'ActivationExpiraLa')::timestamptz < now();`);
+      // Curățare automată a duplicatelor istorice: rămâne o singură cerere deschisă per beneficiar.
+      await runPsql(`with ranked as (select id,row_number() over(partition by upper(coalesce(payload->>'BeneficiaryCode','')) order by id desc) rn from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and payload->>'HeaderCode'=${dollar(session.headerCode)} and payload->>'Status' in ('pending','approved')) update ${dq(PGSCHEMA)}.config_record c set payload=c.payload || jsonb_build_object('Status','superseded','InlocuitLa',${dollar(nowIso)}) from ranked r where c.id=r.id and r.rn>1;`);
       const out=await runPsql(`select coalesce(json_agg(row_to_json(t) order by t."requestedAt" desc)::text,'[]') from (select payload->>'RequestId' as "requestId",payload->>'BeneficiaryCode' as "beneficiaryCode",payload->>'Nume' as name,payload->>'Telefon' as phone,payload->>'Status' as status,payload->>'SolicitatLa' as "requestedAt",payload->>'ActivationExpiraLa' as "activationExpiresAt",case when payload->>'Status'='approved' and (payload->>'ActivationExpiraLa')::timestamptz > now() then payload->>'ActivationCodeDisplay' else null end as "activationCode",payload->>'AprobatLa' as "approvedAt",payload->>'FolositLa' as "usedAt",payload->>'ExpiratLa' as "expiredAt" from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and payload->>'HeaderCode'=${dollar(session.headerCode)} and payload->>'Status' in ('pending','approved','used','expired') order by id desc limit 30) t;`);
       send(res,200,out||'[]','application/json; charset=utf-8'); return true;
     }
     if(url.pathname==='/api/network/approve-activation'&&req.method==='POST'){
       const session=getSeniorSession(req); if(!session||session.role!=='apartinator')throw new Error('Acces rezervat aparținătorului.');
       const b=await readJson(req), requestId=String(b.requestId||''); if(!requestId)throw new Error('Cerere invalidă.');
+      const reqInfoOut=await runPsql(`select coalesce((select json_build_object('code',upper(coalesce(payload->>'BeneficiaryCode','')),'status',payload->>'Status')::text from ${dq(PGSCHEMA)}.config_record where section_key='beneficiary-activation-request' and payload->>'RequestId'=${dollar(requestId)} and payload->>'HeaderCode'=${dollar(session.headerCode)} order by id desc limit 1),'{}');`);
+      const reqInfo=JSON.parse(reqInfoOut||'{}'); if(!reqInfo.code)throw new Error('Cererea nu a fost găsită.'); if(reqInfo.status==='used')throw new Error('Cererea a fost deja utilizată.');
+      await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload || jsonb_build_object('Status','superseded','InlocuitLa',${dollar(new Date().toISOString())}) where section_key='beneficiary-activation-request' and payload->>'HeaderCode'=${dollar(session.headerCode)} and upper(coalesce(payload->>'BeneficiaryCode',''))=${dollar(reqInfo.code)} and payload->>'RequestId'<>${dollar(requestId)} and payload->>'Status' in ('pending','approved');`);
       const activationCode=randomDigits(6), salt=crypto.randomBytes(16).toString('hex'), iterations=180000, hash=passwordHash(activationCode,salt,iterations), expiresAt=new Date(Date.now()+15*60*1000).toISOString();
       const out=await runPsql(`update ${dq(PGSCHEMA)}.config_record set payload=payload || jsonb_build_object('Status','approved','ActivationHash',${dollar(hash)},'ActivationSalt',${dollar(salt)},'ActivationIterations',${iterations},'ActivationCodeDisplay',${dollar(activationCode)},'ActivationExpiraLa',${dollar(expiresAt)},'AprobatLa',${dollar(new Date().toISOString())}) where section_key='beneficiary-activation-request' and payload->>'RequestId'=${dollar(requestId)} and payload->>'HeaderCode'=${dollar(session.headerCode)} and payload->>'Status' in ('pending','approved','expired') returning id;`);
       if(!out)throw new Error('Cererea nu a fost găsită sau a fost deja utilizată.');

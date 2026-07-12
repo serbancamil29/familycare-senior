@@ -18,7 +18,7 @@
         <div class="brand-mark" aria-hidden="true">FC</div>
         <div>
           <strong>FamilyCare</strong>
-          <span>v5.1.3</span>
+          <span>v5.1.4</span>
         </div>
       </header>
 
@@ -102,21 +102,18 @@
     <section class="dialog-card activation-dialog-card">
       <div class="dialog-head">
         <div>
-          <span id="activationStepLabel" class="step-label">PASUL 1 DIN 3</span>
-          <h2 id="activationTitle">Solicită activarea</h2>
-          <p id="activationCopy">Introdu telefonul și codul beneficiarului.</p>
+          <span class="step-label">ACTIVARE CONT SENIOR</span>
+          <h2>Activează accesul</h2>
+          <p>Solicită aprobarea aparținătorului, apoi introdu codul primit.</p>
         </div>
         <button id="closeActivation" class="dialog-close" type="button" aria-label="Închide">×</button>
       </div>
-      <form id="activationRequestForm" class="form-stack">
+      <form id="activationForm" class="form-stack">
         <label>Telefon<input name="phone" inputmode="tel" autocomplete="tel" required></label>
         <label>Cod beneficiar<input name="beneficiaryCode" autocomplete="off" required></label>
-        <div class="dialog-actions"><button id="cancelActivation" class="secondary" type="button">Renunță</button><button class="primary">Trimite cererea</button></div>
-      </form>
-      <form id="activationCodeForm" class="form-stack" hidden>
-        <div class="activation-wait"><strong>Cererea a fost trimisă</strong><span>Aparținătorul trebuie să o aprobe și să îți comunice codul.</span></div>
-        <label>Cod de activare<input name="activationCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
-        <div class="dialog-actions"><button id="backActivation" class="secondary" type="button">Înapoi</button><button class="primary">Verifică codul</button></div>
+        <label>Cod de activare<input name="activationCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="Se completează după aprobare"></label>
+        <div class="activation-wait"><strong>Pasul 1</strong><span>Apasă „Solicită activarea”. Aparținătorul aprobă cererea și îți comunică un cod valabil 15 minute.</span></div>
+        <div class="dialog-actions activation-actions"><button id="cancelActivation" class="secondary" type="button">Renunță</button><button id="requestActivation" class="secondary" type="button">Solicită activarea</button><button class="primary" type="submit">Verifică și continuă</button></div>
       </form>
       <div id="activationMessage" class="message" role="status" aria-live="polite"></div>
     </section>
@@ -197,40 +194,38 @@
     });
 
     const activationDialog=$('#activationDialog'), pinDialog=$('#pinDialog');
-    let activationRequest={phone:'',beneficiaryCode:'',requestId:''};
-    function setActivationStage(stage){
-      const requestStage=stage===1;
-      $('#activationRequestForm').hidden=!requestStage;
-      $('#activationCodeForm').hidden=requestStage;
-      $('#activationStepLabel').textContent=requestStage?'PASUL 1 DIN 3':'PASUL 2 DIN 3';
-      $('#activationTitle').textContent=requestStage?'Solicită activarea':'Introdu codul de activare';
-      $('#activationCopy').textContent=requestStage?'Introdu telefonul și codul beneficiarului.':'Primește codul de la aparținător și introdu-l mai jos.';
-      setMsg('#activationMessage','');
-    }
-    function closeActivation(){activationDialog.close();$('#activationRequestForm').reset();$('#activationCodeForm').reset();activationRequest={phone:'',beneficiaryCode:'',requestId:''};setActivationStage(1)}
-    $('#openActivation').addEventListener('click',()=>{setActivationStage(1);activationDialog.showModal();setTimeout(()=>$('#activationRequestForm input')?.focus(),80)});
+    let activationToken='';
+    function closeActivation(){activationDialog.close();setMsg('#activationMessage','')}
+    $('#openActivation').addEventListener('click',()=>{activationDialog.showModal();setTimeout(()=>$('#activationForm input[name="phone"]')?.focus(),80)});
     $('#closeActivation').addEventListener('click',closeActivation);
     $('#cancelActivation').addEventListener('click',closeActivation);
-    $('#backActivation').addEventListener('click',()=>setActivationStage(1));
     activationDialog.addEventListener('click',event=>{if(event.target===activationDialog)closeActivation()});
 
-    $('#activationRequestForm').addEventListener('submit',async event=>{
+    $('#requestActivation').addEventListener('click',async()=>{
+      setMsg('#activationMessage','');
+      const form=$('#activationForm');
+      const phone=form.phone.value.trim(), beneficiaryCode=form.beneficiaryCode.value.trim();
+      if(!phone||!beneficiaryCode)return setMsg('#activationMessage','Completează telefonul și codul beneficiarului.');
+      const response=await fetch('/api/network/request-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,beneficiaryCode})});
+      const data=await response.json(); if(!response.ok)return setMsg('#activationMessage',data.error);
+      sessionStorage.setItem('fc-activation',JSON.stringify({phone,beneficiaryCode,requestId:data.requestId||''}));
+      setMsg('#activationMessage',data.status==='approved'?'Cererea este deja aprobată. Introdu codul primit de la aparținător.':'Cererea a ajuns la aparținător. După aprobare, introdu codul în acest formular.',true);
+      form.activationCode.focus();
+    });
+
+    $('#activationForm').addEventListener('submit',async event=>{
       event.preventDefault(); setMsg('#activationMessage','');
       const payload=Object.fromEntries(new FormData(event.target));
-      const response=await fetch('/api/network/request-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const saved=JSON.parse(sessionStorage.getItem('fc-activation')||'{}');
+      if(saved.phone===payload.phone&&String(saved.beneficiaryCode||'').toUpperCase()===String(payload.beneficiaryCode||'').toUpperCase())payload.requestId=saved.requestId||'';
+      const response=await fetch('/api/network/verify-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       const data=await response.json(); if(!response.ok)return setMsg('#activationMessage',data.error);
-      activationRequest={phone:payload.phone,beneficiaryCode:payload.beneficiaryCode,requestId:data.requestId};
-      setActivationStage(2); setMsg('#activationMessage','Cererea a ajuns la aparținător.',true); setTimeout(()=>$('#activationCodeForm input')?.focus(),80);
-    });
-    $('#activationCodeForm').addEventListener('submit',async event=>{
-      event.preventDefault(); setMsg('#activationMessage','');
-      const activationCode=new FormData(event.target).get('activationCode');
-      const response=await fetch('/api/network/verify-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...activationRequest,activationCode})});
-      const data=await response.json(); if(!response.ok)return setMsg('#activationMessage',data.error);
-      activationToken=data.activationToken; activationDialog.close();
+      sessionStorage.removeItem('fc-activation'); activationToken=data.activationToken; activationDialog.close();
       $('#activationUser').textContent=`Utilizator: ${data.user}. Introdu același PIN de două ori.`;
       $('#pinSetupForm').reset(); setMsg('#pinMessage',''); pinDialog.showModal(); setTimeout(()=>$('#pinSetupForm input')?.focus(),80);
     });
+
+    try{const saved=JSON.parse(sessionStorage.getItem('fc-activation')||'{}');if(saved.phone&&saved.beneficiaryCode){$('#activationForm').phone.value=saved.phone;$('#activationForm').beneficiaryCode.value=saved.beneficiaryCode}}catch(_){ }
     $('#pinSetupForm').addEventListener('submit',async event=>{
       event.preventDefault(); setMsg('#pinMessage','');
       const data=Object.fromEntries(new FormData(event.target));
