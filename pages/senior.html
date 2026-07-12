@@ -13,9 +13,9 @@
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page no-program-strip">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v1.0.94</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v2.0.1</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
-     <button id="themeBtn" type="button">Dark</button>
+     <button id="themeBtn" class="theme-icon-button" type="button" aria-label="Activează tema întunecată" title="Activează tema întunecată">🌙</button>
      <button id="languageBtn" type="button">RO</button>
      <div class="kiosk-now" id="currentNow">Azi · --:--</div>
     </div>
@@ -418,8 +418,9 @@ document.getElementById('complaintForm').onsubmit=async event=>{event.preventDef
 document.getElementById('satisfactionForm').onsubmit=async event=>{event.preventDefault();if(!satisfactionScore){toast('Alege un număr de la 1 la 5.');return;}const ok=await submitFeedback({type:'satisfaction',category:'Calitatea serviciilor',score:satisfactionScore,message:document.getElementById('satisfactionMessage').value.trim(),anonymous:true});if(ok){event.target.reset();satisfactionScore=0;document.querySelectorAll('[data-score]').forEach(b=>b.classList.remove('selected'));}};
 
 const themeBtn=document.getElementById('themeBtn');
-if(themeBtn) themeBtn.textContent=document.documentElement.classList.contains('dark-theme')?'Light':'Dark';
-if(themeBtn) themeBtn.onclick=()=>{const isDark=document.documentElement.classList.toggle('dark-theme'); document.body.classList.toggle('dark-theme',isDark); localStorage.setItem('familycare-theme',isDark?'dark':'light'); themeBtn.textContent=isDark?'Light':'Dark';};
+function updateThemeButton(){if(!themeBtn)return;const isDark=document.documentElement.classList.contains('dark-theme');themeBtn.textContent=isDark?'☀️':'🌙';themeBtn.setAttribute('aria-label',isDark?'Activează tema luminoasă':'Activează tema întunecată');themeBtn.title=isDark?'Activează tema luminoasă':'Activează tema întunecată';}
+updateThemeButton();
+if(themeBtn) themeBtn.onclick=()=>{const isDark=document.documentElement.classList.toggle('dark-theme'); document.body.classList.toggle('dark-theme',isDark); localStorage.setItem('familycare-theme',isDark?'dark':'light'); updateThemeButton();};
 document.getElementById('languageBtn').onclick=()=>toast('Limba RO este activă.');
 const logoutBtn=document.getElementById('logoutBtn');
 if(logoutBtn) logoutBtn.onclick=async()=>{try{await apiFetch('/api/senior/logout',{method:'DELETE'});}catch(e){}localStorage.removeItem(SESSION_KEY);location.href='senior-login.html';};
