@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ro" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#2563eb">
+  <title>FamilyCare</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles/common.css?v=5.0.2">
+  <link rel="stylesheet" href="/styles/access-v4.css?v=5.0.2">
+</head>
+<body class="access-page">
+  <button id="themeBtn" class="theme-floating" type="button" aria-label="Schimbă tema">☾</button>
+
+  <main class="access-shell access-shell-clean">
+    <section class="access-card access-card-clean">
+      <header class="login-brand">
+        <div class="brand-mark" aria-hidden="true">FC</div>
+        <div>
+          <strong>FamilyCare</strong>
+          <span>v5.1.0</span>
+        </div>
+      </header>
+
+      <section id="roleChoice" class="login-section">
+        <div class="login-heading">
+          <h1>Cine folosește aplicația?</h1>
+          <p>Alege tipul de acces potrivit.</p>
+        </div>
+        <div class="role-grid-clean">
+          <button data-role="caregiver" class="role-card-clean" type="button">
+            <span class="role-icon" aria-hidden="true">👨‍👩‍👧</span>
+            <strong>Aparținător</strong>
+            <small>Administrează rețeaua și beneficiarii</small>
+          </button>
+          <button data-role="senior" class="role-card-clean" type="button">
+            <span class="role-icon" aria-hidden="true">👤</span>
+            <strong>Senior</strong>
+            <small>Intră simplu cu utilizator și PIN</small>
+          </button>
+        </div>
+      </section>
+
+      <section id="caregiverMode" class="login-section" hidden>
+        <button type="button" class="back-role">← Înapoi</button>
+        <div class="subtabs">
+          <button class="active" data-sub="login" type="button">Intră în cont</button>
+          <button data-sub="setup" type="button">Creează rețeaua</button>
+        </div>
+
+        <form id="caregiverLogin" class="form-stack">
+          <div class="login-heading align-left">
+            <h1>Acces aparținător</h1>
+            <p>Intră în rețeaua familiei tale.</p>
+          </div>
+          <label>Utilizator sau telefon<input name="identifier" autocomplete="username" required></label>
+          <label>Parolă<input name="password" type="password" autocomplete="current-password" required></label>
+          <button class="primary">Intră în rețea</button>
+        </form>
+
+        <form id="networkSetup" class="form-stack" hidden>
+          <div class="login-heading align-left">
+            <h1>Creează rețeaua</h1>
+            <p>Completează datele aparținătorului și ale beneficiarilor.</p>
+          </div>
+          <div class="grid2"><label>Prenume<input name="firstName" required></label><label>Nume<input name="lastName" required></label></div>
+          <div class="grid2"><label>Telefon<input name="phone" inputmode="tel" required></label><label>Utilizator<input name="user" autocomplete="username" required></label></div>
+          <label>Parolă<input name="password" type="password" minlength="8" autocomplete="new-password" required></label>
+          <div class="beneficiary-head"><h2>Beneficiari</h2><button type="button" id="addBeneficiary" class="secondary">+ Adaugă</button></div>
+          <div id="beneficiaryRows"></div>
+          <button class="primary">Creează rețeaua</button>
+        </form>
+      </section>
+
+      <section id="seniorMode" class="login-section senior-entry" hidden>
+        <button type="button" class="back-role">← Înapoi</button>
+        <div class="login-heading align-left">
+          <h1>Acces Senior</h1>
+          <p>Introdu utilizatorul și PIN-ul tău.</p>
+        </div>
+
+        <form id="pinLoginForm" class="form-stack senior-login-form">
+          <label>Utilizator<input name="user" autocomplete="username" required></label>
+          <label>PIN din 4 cifre<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="current-password" required></label>
+          <button class="primary">Intră în FamilyCare</button>
+        </form>
+
+        <div class="activation-entry">
+          <div>
+            <strong>Prima utilizare?</strong>
+            <span>Activează contul cu datele primite de la aparținător.</span>
+          </div>
+          <button id="openActivation" class="secondary activation-open" type="button">Activare</button>
+        </div>
+      </section>
+
+      <div id="message" class="message" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+
+  <dialog id="activationDialog" class="flow-dialog">
+    <section class="dialog-card activation-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <span id="activationStepLabel" class="step-label">PASUL 1 DIN 3</span>
+          <h2 id="activationTitle">Solicită activarea</h2>
+          <p id="activationCopy">Introdu telefonul și codul beneficiarului.</p>
+        </div>
+        <button id="closeActivation" class="dialog-close" type="button" aria-label="Închide">×</button>
+      </div>
+      <form id="activationRequestForm" class="form-stack">
+        <label>Telefon<input name="phone" inputmode="tel" autocomplete="tel" required></label>
+        <label>Cod beneficiar<input name="beneficiaryCode" autocomplete="off" required></label>
+        <div class="dialog-actions"><button id="cancelActivation" class="secondary" type="button">Renunță</button><button class="primary">Trimite cererea</button></div>
+      </form>
+      <form id="activationCodeForm" class="form-stack" hidden>
+        <div class="activation-wait"><strong>Cererea a fost trimisă</strong><span>Aparținătorul trebuie să o aprobe și să îți comunice codul.</span></div>
+        <label>Cod de activare<input name="activationCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+        <div class="dialog-actions"><button id="backActivation" class="secondary" type="button">Înapoi</button><button class="primary">Verifică codul</button></div>
+      </form>
+      <div id="activationMessage" class="message" role="status" aria-live="polite"></div>
+    </section>
+  </dialog>
+
+  <dialog id="pinDialog" class="flow-dialog">
+    <form id="pinSetupForm" class="dialog-card activation-dialog-card">
+      <div class="dialog-head">
+        <div>
+          <span class="step-label">PASUL 3 DIN 3</span>
+          <h2>Alege PIN-ul</h2>
+          <p id="activationUser">Introdu același PIN de două ori.</p>
+        </div>
+      </div>
+      <label>PIN nou din 4 cifre<input name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label>
+      <label>Confirmă PIN-ul<input name="confirmPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="new-password" required></label>
+      <button class="primary">Salvează PIN-ul și intră</button>
+      <div id="pinMessage" class="message" role="status" aria-live="polite"></div>
+    </form>
+  </dialog>
+
+  <script src="/app-universal.js?v=5.0.2"></script>
+  <script>
+    const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+    let activationToken='';
+    const setMsg=(selector,text,ok=false)=>{const e=$(selector);e.textContent=text||'';e.className='message '+(text?(ok?'ok':'error'):'')};
+    const msg=(text,ok=false)=>setMsg('#message',text,ok);
+
+    function setRole(role){
+      $('#roleChoice').hidden=true;
+      $('#caregiverMode').hidden=role!=='caregiver';
+      $('#seniorMode').hidden=role!=='senior';
+      msg('');
+      setTimeout(()=>document.querySelector(`#${role==='caregiver'?'caregiverMode':'seniorMode'} input`)?.focus(),80);
+    }
+    $$('[data-role]').forEach(button=>button.addEventListener('click',()=>setRole(button.dataset.role)));
+    $$('.back-role').forEach(button=>button.addEventListener('click',()=>{
+      $('#roleChoice').hidden=false; $('#caregiverMode').hidden=true; $('#seniorMode').hidden=true; msg('');
+    }));
+
+    document.documentElement.dataset.theme=localStorage.getItem('fc-theme')||'light';
+    function refreshTheme(){ $('#themeBtn').textContent=document.documentElement.dataset.theme==='dark'?'☀':'☾'; }
+    refreshTheme();
+    $('#themeBtn').addEventListener('click',()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark';localStorage.setItem('fc-theme',document.documentElement.dataset.theme);refreshTheme()});
+
+    $$('[data-sub]').forEach(button=>button.addEventListener('click',()=>{
+      $$('[data-sub]').forEach(item=>item.classList.toggle('active',item===button));
+      $('#caregiverLogin').hidden=button.dataset.sub!=='login';
+      $('#networkSetup').hidden=button.dataset.sub!=='setup';
+      msg('');
+    }));
+
+    const colors=['#2865ed','#168a4a','#e08a00','#c42b38','#7b4ce2','#008b8b','#d15b9f','#52657d'];
+    function addRow(){
+      const row=document.createElement('div'); row.className='beneficiary-row';
+      row.innerHTML=`<div class="grid2"><label>Prenume<input data-k="firstName" required></label><label>Nume<input data-k="lastName" required></label></div><div class="grid2"><label>Vârstă<input data-k="age" type="number" min="1" max="120" required></label><label>Telefon<input data-k="phone" inputmode="tel" required></label></div><label>Utilizator Senior<input data-k="seniorUser" minlength="3" maxlength="40" placeholder="Ex. stefan.popescu" required></label><label>Culoare<select data-k="cardColor">${colors.map(color=>`<option value="${color}">${color}</option>`).join('')}</select></label>`;
+      $('#beneficiaryRows').appendChild(row);
+    }
+    $('#addBeneficiary').addEventListener('click',addRow); addRow();
+
+    $('#caregiverLogin').addEventListener('submit',async event=>{
+      event.preventDefault(); msg('');
+      const response=await fetch('/api/network/caregiver-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(event.target)))});
+      const data=await response.json(); if(!response.ok)return msg(data.error); location.href=data.redirect;
+    });
+    $('#networkSetup').addEventListener('submit',async event=>{
+      event.preventDefault(); msg('');
+      const form=new FormData(event.target);
+      const beneficiaries=$$('#beneficiaryRows .beneficiary-row').map(row=>Object.fromEntries([...row.querySelectorAll('[data-k]')].map(input=>[input.dataset.k,input.value])));
+      const caregiver={firstName:form.get('firstName'),lastName:form.get('lastName'),phone:form.get('phone'),user:form.get('user'),password:form.get('password')};
+      const response=await fetch('/api/network/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({caregiver,beneficiaries})});
+      const data=await response.json(); if(!response.ok)return msg(data.error); msg('Rețeaua a fost creată. Intră în cont pentru a vedea datele beneficiarilor.',true);
+    });
+    $('#pinLoginForm').addEventListener('submit',async event=>{
+      event.preventDefault(); msg('');
+      const response=await fetch('/api/network/pin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.fromEntries(new FormData(event.target)))});
+      const data=await response.json(); if(!response.ok)return msg(data.error); location.href=data.redirect;
+    });
+
+    const activationDialog=$('#activationDialog'), pinDialog=$('#pinDialog');
+    let activationRequest={phone:'',beneficiaryCode:'',requestId:''};
+    function setActivationStage(stage){
+      const requestStage=stage===1;
+      $('#activationRequestForm').hidden=!requestStage;
+      $('#activationCodeForm').hidden=requestStage;
+      $('#activationStepLabel').textContent=requestStage?'PASUL 1 DIN 3':'PASUL 2 DIN 3';
+      $('#activationTitle').textContent=requestStage?'Solicită activarea':'Introdu codul de activare';
+      $('#activationCopy').textContent=requestStage?'Introdu telefonul și codul beneficiarului.':'Primește codul de la aparținător și introdu-l mai jos.';
+      setMsg('#activationMessage','');
+    }
+    function closeActivation(){activationDialog.close();$('#activationRequestForm').reset();$('#activationCodeForm').reset();activationRequest={phone:'',beneficiaryCode:'',requestId:''};setActivationStage(1)}
+    $('#openActivation').addEventListener('click',()=>{setActivationStage(1);activationDialog.showModal();setTimeout(()=>$('#activationRequestForm input')?.focus(),80)});
+    $('#closeActivation').addEventListener('click',closeActivation);
+    $('#cancelActivation').addEventListener('click',closeActivation);
+    $('#backActivation').addEventListener('click',()=>setActivationStage(1));
+    activationDialog.addEventListener('click',event=>{if(event.target===activationDialog)closeActivation()});
+
+    $('#activationRequestForm').addEventListener('submit',async event=>{
+      event.preventDefault(); setMsg('#activationMessage','');
+      const payload=Object.fromEntries(new FormData(event.target));
+      const response=await fetch('/api/network/request-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const data=await response.json(); if(!response.ok)return setMsg('#activationMessage',data.error);
+      activationRequest={phone:payload.phone,beneficiaryCode:payload.beneficiaryCode,requestId:data.requestId};
+      setActivationStage(2); setMsg('#activationMessage','Cererea a ajuns la aparținător.',true); setTimeout(()=>$('#activationCodeForm input')?.focus(),80);
+    });
+    $('#activationCodeForm').addEventListener('submit',async event=>{
+      event.preventDefault(); setMsg('#activationMessage','');
+      const activationCode=new FormData(event.target).get('activationCode');
+      const response=await fetch('/api/network/verify-activation',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...activationRequest,activationCode})});
+      const data=await response.json(); if(!response.ok)return setMsg('#activationMessage',data.error);
+      activationToken=data.activationToken; activationDialog.close();
+      $('#activationUser').textContent=`Utilizator: ${data.user}. Introdu același PIN de două ori.`;
+      $('#pinSetupForm').reset(); setMsg('#pinMessage',''); pinDialog.showModal(); setTimeout(()=>$('#pinSetupForm input')?.focus(),80);
+    });
+    $('#pinSetupForm').addEventListener('submit',async event=>{
+      event.preventDefault(); setMsg('#pinMessage','');
+      const data=Object.fromEntries(new FormData(event.target));
+      if(data.pin!==data.confirmPin)return setMsg('#pinMessage','PIN-urile nu coincid. Introdu același PIN în ambele câmpuri.');
+      const response=await fetch('/api/network/setup-pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activationToken,...data})});
+      const result=await response.json(); if(!response.ok)return setMsg('#pinMessage',result.error); location.href=result.redirect;
+    });
+  </script>
+</body>
+</html>
