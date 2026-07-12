@@ -826,8 +826,9 @@ async function handleApi(req,res,url){
        b.branch_code,
        coalesce(to_jsonb(e)->>'address_details', e.address_notes, e.access_details, concat_ws(', ', to_jsonb(e)->>'country', to_jsonb(e)->>'city', to_jsonb(e)->>'street', to_jsonb(e)->>'street_no')) as address_details,
        coalesce(to_jsonb(e)->>'responsible_name', e.notes, '') as responsible_name,
-       coalesce(card_style.card_color,'') as card_color,
-       coalesce(card_style.card_text_color,'') as card_text_color
+       coalesce(nullif(access_style.card_color,''), nullif(card_style.card_color,''),
+         case when coalesce(e.notes,'') ~* 'CardColor:#[0-9a-f]{6}' then regexp_replace(e.notes, '.*CardColor:(#[0-9A-Fa-f]{6}).*', '\\1') else '' end, '') as card_color,
+       coalesce(nullif(card_style.card_text_color,''),'') as card_text_color
      from ${dq(PGSCHEMA)}.managed_entity e
      left join ${dq(PGSCHEMA)}.care_branch b on b.id=e.care_branch_id
      left join ${dq(PGSCHEMA)}.care_header h on h.id=e.care_header_id
@@ -841,6 +842,14 @@ async function handleApi(req,res,url){
        order by c.id desc
        limit 1
      ) card_style on true
+     left join lateral (
+       select c.payload->>'CardColor' as card_color
+       from ${dq(PGSCHEMA)}.config_record c
+       where c.section_key='beneficiary-access'
+         and coalesce(c.payload->>'BeneficiaryCode','')=e.entity_code
+       order by c.id desc
+       limit 1
+     ) access_style on true
      where coalesce(e.active,true)=true${branchFilter}${headerFilter}${entityFilter}
      order by coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code)
      limit ${displayLimit||100}
