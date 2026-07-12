@@ -4801,3 +4801,44 @@ html.dark-theme{--sv3-bg:#08101f;--sv3-card:#111b2e;--sv3-card2:#162238;--sv3-te
 .senior-person-card span,.strip-title span,.kiosk-treatment span,.kiosk-treatment small{color:var(--sv3-muted)!important}
 html.dark-theme .login-note{background:var(--sv3-card2)!important;color:var(--sv3-muted)!important;border-color:var(--sv3-line)!important}
 :focus-visible{outline:4px solid #60a5fa!important;outline-offset:3px}
+
+
+/* v5.1.6 accessibility and header fixes */
+.senior-person-card,
+html.dark-theme .senior-person-card {
+  background: var(--senior-card-bg, #2563EB) !important;
+  color: var(--senior-card-text, #FFFFFF) !important;
+  border-color: color-mix(in srgb, var(--senior-card-bg, #2563EB) 72%, #000 28%) !important;
+}
+.senior-person-card b,
+.senior-person-card span,
+html.dark-theme .senior-person-card b,
+html.dark-theme .senior-person-card span {
+  color: var(--senior-card-text, #FFFFFF) !important;
+  text-shadow: none !important;
+}
+.logout-top-button {
+  min-height: 42px;
+  border: 1px solid #CBD5E1;
+  border-radius: 16px;
+  padding: 8px 15px;
+  background: #FFFFFF;
+  color: #B42318;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+html.dark-theme .logout-top-button {
+  background:#17233D;
+  color:#FCA5A5;
+  border-color:#425274;
+}
+@media (max-width:640px) and (orientation:portrait) {
+  .kiosk-actions-top { grid-template-columns: 52px 58px minmax(72px,1fr) !important; }
+  .kiosk-actions-top #logoutBtn {
+    display:flex !important; align-items:center; justify-content:center;
+    min-width:0 !important; min-height:42px !important; height:42px !important;
+    padding:7px 8px !important; border-radius:18px !important; font-size:14px !important;
+  }
+  .kiosk-now { grid-column:1 / -1 !important; }
+}
