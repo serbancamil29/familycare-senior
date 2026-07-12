@@ -1,2 +1,0 @@
-/* Page-specific stylesheet. Shared visual system is in common.css. */
-.alert-item{border:1px solid var(--line);border-radius:16px;padding:16px;background:var(--surface);margin-bottom:12px}.severity-high{border-left:5px solid var(--danger)}.severity-medium{border-left:5px solid var(--warning)}.severity-low{border-left:5px solid var(--primary)}
