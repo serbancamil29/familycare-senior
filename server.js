@@ -181,7 +181,7 @@ const TLS_PFX_PATH = process.env.TLS_PFX_PATH || path.join(ROOT, 'certs', 'famil
 const TLS_PFX_PASSPHRASE = process.env.TLS_PFX_PASSPHRASE || 'familycare-local';
 const PROTOCOL = HTTPS_ENABLED ? 'https' : 'http';
 const SENIOR_ENTITY_CODE = String(process.env.SENIOR_ENTITY_CODE || '').trim();
-// V3.0.1: Senior folosește același login ca Main și acceptă parola sau PIN-ul de 4 cifre, ca să lege aparținătorul de beneficiarii lui.
+// V3.0.2: Senior folosește același login ca Main și acceptă parola sau PIN-ul de 4 cifre, ca să lege aparținătorul de beneficiarii lui.
 // Doar pentru demo se poate dezactiva cu SENIOR_AUTH_DISABLED=true sau FAMILYCARE_AUTH_DISABLED=true.
 const SENIOR_AUTH_DISABLED = ['true','1','yes','da'].includes(String(process.env.SENIOR_AUTH_DISABLED || process.env.FAMILYCARE_AUTH_DISABLED || '').trim().toLowerCase());
 const SESSION_TTL_MS = Math.max(15 * 60 * 1000, Number(process.env.SESSION_TTL_MINUTES || 720) * 60 * 1000);
@@ -624,7 +624,7 @@ async function handleApi(req,res,url){
    const sql=`select coalesce(json_agg(row_to_json(t))::text,'[]') from (
      select
        e.entity_code,
-       coalesce(to_jsonb(e)->>'name', to_jsonb(e)->>'display_name', e.entity_code) as name,
+       coalesce(nullif(to_jsonb(e)->>'name',''), nullif(to_jsonb(e)->>'display_name',''), nullif(e.entity_code,''), 'Beneficiar') as name,
        e.entity_type,
        coalesce(b.name, to_jsonb(e)->>'branch_name') as branch_name,
        b.branch_code,
@@ -696,4 +696,4 @@ let server;
 if(HTTPS_ENABLED){if(!fs.existsSync(TLS_PFX_PATH)){console.error('ERROR: HTTPS este activ, dar certificatul lipsește: '+TLS_PFX_PATH);process.exit(1)}server=https.createServer({pfx:fs.readFileSync(TLS_PFX_PATH),passphrase:TLS_PFX_PASSPHRASE},requestHandler)}else{server=http.createServer(requestHandler)}
 server.on('error',err=>{if(err&&err.code==='EADDRINUSE')console.error('ERROR: Portul '+PORT+' este deja folosit. Oprește instanța existentă sau schimbă PORT.');else console.error('ERROR server:',err&&err.message?err.message:err);process.exitCode=1});
 const PID_FILE=path.join(ROOT,'.familycare-senior.pid');try{fs.writeFileSync(PID_FILE,String(process.pid),'utf8')}catch(_){}function removePidFile(){try{if(fs.existsSync(PID_FILE)&&fs.readFileSync(PID_FILE,'utf8').trim()===String(process.pid))fs.unlinkSync(PID_FILE)}catch(_){}}function shutdown(){server.close(()=>process.exit(0));if(typeof server.closeAllConnections==='function')server.closeAllConnections();setTimeout(()=>process.exit(0),1500).unref()}process.on('exit',removePidFile);process.on('SIGINT',shutdown);process.on('SIGTERM',shutdown);
-server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V3.0.1 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
+server.listen(PORT,HOST,()=>{console.log('============================================================');console.log('FamilyCare Senior V3.0.2 is running');console.log('URL: '+PROTOCOL+'://localhost:'+PORT+(SENIOR_AUTH_DISABLED?'/pages/senior.html':'/pages/senior-login.html'));console.log('Senior authentication: '+(SENIOR_AUTH_DISABLED?'disabled for testing':'user login required'));console.log('Database: '+(process.env.PGDATABASE||'(default)')+' / schema '+PGSCHEMA);console.log('DB mode: '+(process.env.DATABASE_URL?'DATABASE_URL / pg':'local psql'));console.log('Privacy mode: '+(SENIOR_ENTITY_CODE?'single beneficiary '+SENIOR_ENTITY_CODE:'family / multiple beneficiaries'));if(MAIN_BASE_URL)console.log('Main URL: '+MAIN_BASE_URL);console.log('Press CTRL+C in this window to stop the server.');console.log('============================================================')});
