@@ -5000,3 +5000,132 @@ html.dark-theme .senior-person-card span {
   }
   .kiosk-actions-top.sound-top-actions #themeBtn { width:38px !important; min-width:38px !important; font-size:18px !important; }
 }
+
+/* =========================================================
+   v5.1.8 — mobile-first responsive standard
+   - controls always visible in portrait and landscape
+   - no fixed-height landscape overlays
+   - content flows vertically and scrolls naturally
+   ========================================================= */
+.kiosk-top {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto !important;
+  align-items:center !important;
+  gap:10px !important;
+  min-width:0 !important;
+  overflow:visible !important;
+}
+.kiosk-brand { min-width:0 !important; overflow:hidden !important; }
+.kiosk-brand > div { min-width:0 !important; }
+.kiosk-brand b,.kiosk-brand span { overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; }
+.kiosk-actions-top.sound-top-actions {
+  display:grid !important;
+  grid-template-columns:42px 48px auto !important;
+  grid-template-areas:"theme language logout" "now now now" !important;
+  align-items:center !important;
+  justify-content:end !important;
+  gap:5px !important;
+  min-width:0 !important;
+  width:max-content !important;
+}
+.kiosk-actions-top.sound-top-actions #themeBtn { grid-area:theme !important; }
+.kiosk-actions-top.sound-top-actions #languageBtn { grid-area:language !important; }
+.kiosk-actions-top.sound-top-actions #logoutBtn { grid-area:logout !important; }
+.kiosk-actions-top.sound-top-actions .kiosk-now { grid-area:now !important; width:100% !important; text-align:right !important; }
+
+@media (max-width:640px) {
+  .kiosk-page,.kiosk-page.no-program-strip {
+    width:100% !important;
+    min-height:100dvh !important;
+    height:auto !important;
+    overflow:visible !important;
+    padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important;
+  }
+  .kiosk-top { grid-template-columns:minmax(0,1fr) auto !important; }
+  .kiosk-brand img { width:34px !important; height:34px !important; }
+  .kiosk-brand b { font-size:16px !important; }
+  .kiosk-brand span { font-size:10px !important; }
+  .kiosk-actions-top.sound-top-actions {
+    grid-template-columns:38px 42px auto !important;
+    gap:4px !important;
+  }
+  .kiosk-actions-top.sound-top-actions #themeBtn,
+  .kiosk-actions-top.sound-top-actions #languageBtn,
+  .kiosk-actions-top.sound-top-actions #logoutBtn {
+    display:flex !important;
+    height:38px !important;
+    min-height:38px !important;
+    visibility:visible !important;
+    opacity:1 !important;
+  }
+  .kiosk-actions-top.sound-top-actions #themeBtn { width:38px !important; min-width:38px !important; font-size:18px !important; }
+  .kiosk-actions-top.sound-top-actions #languageBtn { width:42px !important; min-width:42px !important; padding:0 !important; }
+  .kiosk-actions-top.sound-top-actions #logoutBtn { padding:0 9px !important; font-size:12px !important; }
+  .kiosk-actions-top.sound-top-actions .kiosk-now { font-size:10px !important; line-height:1.2 !important; }
+}
+
+/* Phone landscape follows normal document flow instead of a rigid split screen. */
+@media (orientation:landscape) and (max-width:1000px) and (max-height:600px) {
+  html,body.senior-kiosk-body { min-height:100% !important; height:auto !important; overflow:auto !important; }
+  .kiosk-page,.kiosk-page.no-program-strip {
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    grid-template-rows:auto !important;
+    grid-template-areas:
+      "top"
+      "people"
+      "days"
+      "confirm"
+      "actions" !important;
+    min-height:100dvh !important;
+    height:auto !important;
+    overflow:visible !important;
+    gap:8px !important;
+    padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important;
+  }
+  .kiosk-top { grid-area:top !important; position:relative !important; min-height:48px !important; }
+  .senior-cards {
+    grid-area:people !important;
+    display:grid !important;
+    grid-template-columns:repeat(auto-fit,minmax(130px,1fr)) !important;
+    grid-auto-rows:minmax(48px,auto) !important;
+    max-height:none !important;
+    height:auto !important;
+    overflow:visible !important;
+    gap:6px !important;
+  }
+  .day-cards-kiosk {
+    grid-area:days !important;
+    display:grid !important;
+    grid-template-columns:repeat(7,minmax(64px,1fr)) !important;
+    grid-template-rows:auto !important;
+    height:auto !important;
+    min-height:54px !important;
+    overflow-x:auto !important;
+    overflow-y:hidden !important;
+    gap:5px !important;
+    padding-bottom:2px !important;
+  }
+  .kiosk-day { min-width:64px !important; min-height:50px !important; height:auto !important; }
+  .confirm-row {
+    grid-area:confirm !important;
+    min-height:220px !important;
+    height:auto !important;
+    overflow:visible !important;
+  }
+  .confirm-treatment-card,.confirm-zone {
+    min-height:210px !important;
+    height:auto !important;
+    max-height:none !important;
+  }
+  .kiosk-actions {
+    grid-area:actions !important;
+    display:grid !important;
+    grid-template-columns:repeat(4,minmax(120px,1fr)) !important;
+    min-height:64px !important;
+    height:auto !important;
+    overflow-x:auto !important;
+    gap:6px !important;
+  }
+  .kiosk-action { min-width:120px !important; min-height:60px !important; height:auto !important; }
+}
