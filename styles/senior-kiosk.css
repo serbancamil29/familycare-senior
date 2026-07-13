@@ -5129,3 +5129,150 @@ html.dark-theme .senior-person-card span {
   }
   .kiosk-action { min-width:120px !important; min-height:60px !important; height:auto !important; }
 }
+
+
+/* =========================================================
+   v5.1.9 — definitive mobile responsive standard
+   CSS Grid/Flex auto-layout, no fixed screen heights, no overlap
+   ========================================================= */
+:root { --fc-gap: clamp(8px, 2vw, 14px); }
+html, body.senior-kiosk-body { width:100%; min-height:100%; height:auto !important; overflow-x:hidden !important; overflow-y:auto !important; }
+body.senior-kiosk-body { min-height:100dvh !important; }
+.kiosk-page, .kiosk-page.no-program-strip {
+  position:relative !important;
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:stretch !important;
+  width:min(100%, 1200px) !important;
+  min-height:100dvh !important;
+  height:auto !important;
+  max-height:none !important;
+  margin:0 auto !important;
+  padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important;
+  gap:var(--fc-gap) !important;
+  overflow:visible !important;
+}
+.kiosk-page > * { position:relative !important; inset:auto !important; min-width:0 !important; max-width:100% !important; transform:none !important; }
+.kiosk-top { order:1; flex:0 0 auto !important; }
+.senior-cards { order:2; flex:0 0 auto !important; }
+.day-cards-kiosk { order:3; flex:0 0 auto !important; }
+.confirm-row { order:4; flex:0 0 auto !important; }
+.kiosk-actions { order:5; flex:0 0 auto !important; }
+
+/* Header: language is selected only on login. */
+.kiosk-actions-top.sound-top-actions {
+  display:grid !important;
+  grid-template-columns:42px auto !important;
+  grid-template-areas:"theme logout" "now now" !important;
+  gap:5px !important;
+  width:max-content !important;
+  max-width:100% !important;
+}
+.kiosk-actions-top #themeBtn { grid-area:theme !important; display:flex !important; }
+.kiosk-actions-top #logoutBtn { grid-area:logout !important; display:flex !important; }
+.kiosk-actions-top .kiosk-now { grid-area:now !important; }
+
+/* Beneficiary colour is authoritative in both themes. */
+.senior-person-card,
+html:not(.dark-theme) .senior-person-card,
+html.dark-theme .senior-person-card {
+  background:var(--senior-card-bg,#2563EB) !important;
+  background-color:var(--senior-card-bg,#2563EB) !important;
+  background-image:none !important;
+  color:var(--senior-card-text,#FFFFFF) !important;
+  opacity:1 !important;
+  filter:none !important;
+  isolation:isolate !important;
+}
+.senior-person-card::before,.senior-person-card::after { display:none !important; }
+.senior-person-card b,.senior-person-card span,
+html:not(.dark-theme) .senior-person-card b,html:not(.dark-theme) .senior-person-card span,
+html.dark-theme .senior-person-card b,html.dark-theme .senior-person-card span {
+  color:var(--senior-card-text,#FFFFFF) !important;
+  opacity:1 !important;
+}
+
+/* Today and date must always remain readable. */
+.kiosk-day { display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; min-width:74px !important; min-height:64px !important; padding:7px 5px !important; overflow:visible !important; }
+.kiosk-day b,.kiosk-day .day-today,.kiosk-day .day-date { display:block !important; position:static !important; opacity:1 !important; visibility:visible !important; line-height:1.15 !important; white-space:nowrap !important; }
+.kiosk-day .day-today { font-size:11px !important; font-weight:900 !important; text-transform:uppercase !important; color:#B42318 !important; }
+.kiosk-day .day-date { font-size:12px !important; font-weight:800 !important; color:inherit !important; }
+html.dark-theme .kiosk-day .day-today { color:#FCA5A5 !important; }
+.kiosk-day.active .day-today,.kiosk-day.active .day-date,.kiosk-day.active b { color:inherit !important; }
+
+/* Universal small-screen rule: horizontal collections scroll; sections never overlap. */
+@media (max-width: 760px) {
+  .kiosk-top { display:grid !important; grid-template-columns:minmax(0,1fr) auto !important; gap:6px !important; align-items:start !important; }
+  .kiosk-brand img { width:34px !important; height:34px !important; }
+  .kiosk-brand b { font-size:16px !important; }
+  .kiosk-brand span { font-size:10px !important; }
+  .kiosk-actions-top.sound-top-actions { grid-template-columns:38px auto !important; }
+  .kiosk-actions-top.sound-top-actions #themeBtn { width:38px !important; min-width:38px !important; height:38px !important; min-height:38px !important; }
+  .kiosk-actions-top.sound-top-actions #logoutBtn { height:38px !important; min-height:38px !important; padding:0 10px !important; font-size:12px !important; }
+  .kiosk-now { font-size:10px !important; }
+
+  .senior-cards {
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    grid-auto-rows:minmax(62px,auto) !important;
+    height:auto !important; min-height:0 !important; max-height:none !important;
+    overflow:visible !important; gap:7px !important;
+  }
+  .senior-cards[data-count="1"] { grid-template-columns:1fr !important; }
+  .senior-person-card { min-height:62px !important; height:auto !important; padding:9px 10px !important; }
+
+  .day-cards-kiosk {
+    display:grid !important;
+    grid-auto-flow:column !important;
+    grid-auto-columns:minmax(78px,1fr) !important;
+    grid-template-columns:none !important;
+    grid-template-rows:1fr !important;
+    width:100% !important;
+    min-height:66px !important; height:auto !important; max-height:none !important;
+    overflow-x:auto !important; overflow-y:hidden !important;
+    overscroll-behavior-inline:contain !important;
+    scroll-snap-type:x proximity !important;
+    gap:6px !important;
+    padding:1px 1px 5px !important;
+  }
+  .kiosk-day { scroll-snap-align:start !important; }
+
+  .confirm-row,.confirm-treatment-card,.confirm-zones,.confirm-zone {
+    width:100% !important; height:auto !important; max-height:none !important; overflow:visible !important;
+  }
+  .confirm-row { min-height:0 !important; }
+  .confirm-treatment-card { min-height:190px !important; }
+  .confirm-zones { display:grid !important; grid-template-columns:1fr !important; gap:8px !important; }
+  .confirm-zone { min-height:180px !important; }
+
+  .kiosk-actions {
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    width:100% !important; height:auto !important; min-height:0 !important; max-height:none !important;
+    overflow:visible !important; gap:8px !important;
+  }
+  .kiosk-action { min-height:68px !important; height:auto !important; }
+}
+
+/* Landscape phones: use the same document flow, only compact spacing. */
+@media (orientation:landscape) and (max-width:1000px) and (max-height:600px) {
+  html,body.senior-kiosk-body { height:auto !important; min-height:100% !important; overflow-y:auto !important; }
+  .kiosk-page,.kiosk-page.no-program-strip {
+    display:flex !important;
+    flex-direction:column !important;
+    grid-template:none !important;
+    min-height:100dvh !important;
+    height:auto !important;
+    max-height:none !important;
+    overflow:visible !important;
+    gap:6px !important;
+  }
+  .kiosk-top,.senior-cards,.day-cards-kiosk,.confirm-row,.kiosk-actions { grid-area:auto !important; position:relative !important; inset:auto !important; }
+  .senior-cards { grid-template-columns:repeat(auto-fit,minmax(150px,1fr)) !important; grid-auto-rows:minmax(54px,auto) !important; }
+  .day-cards-kiosk { grid-auto-columns:minmax(82px,1fr) !important; min-height:58px !important; }
+  .kiosk-day { min-height:56px !important; }
+  .confirm-treatment-card { min-height:180px !important; }
+  .confirm-zone { min-height:165px !important; }
+  .kiosk-actions { grid-template-columns:repeat(4,minmax(120px,1fr)) !important; overflow-x:auto !important; overflow-y:hidden !important; }
+  .kiosk-action { min-width:120px !important; min-height:58px !important; }
+}

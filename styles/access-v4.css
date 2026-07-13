@@ -33,3 +33,12 @@
 /* v5.1.8: hidden panels must never leak into the active login mode */
 [hidden] { display: none !important; }
 #caregiverLogin[hidden], #networkSetup[hidden], #caregiverMode[hidden], #seniorMode[hidden], #roleChoice[hidden] { display:none !important; }
+
+
+/* v5.1.9 login-only language preference */
+.login-preferences{position:fixed;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));z-index:50;display:flex;align-items:center;gap:8px}
+.login-preferences .theme-floating{position:static!important;inset:auto!important}
+.login-preferences select{height:44px;min-width:64px;padding:0 10px;border:1px solid #cbd5e1;border-radius:14px;background:#fff;color:#0f172a;font:inherit;font-weight:900;box-shadow:0 8px 24px rgba(15,23,42,.12)}
+html[data-theme="dark"] .login-preferences select,html.dark-theme .login-preferences select{background:#17233d;color:#f8fafc;border-color:#425274}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@media(max-width:480px){.login-preferences{top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));gap:5px}.login-preferences select{height:40px;min-width:58px;padding:0 7px}.login-preferences .theme-floating{width:40px!important;height:40px!important}}

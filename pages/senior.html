@@ -7,16 +7,15 @@
  <link rel="manifest" href="../manifest.webmanifest"><link rel="apple-touch-icon" href="../assets/icon-192.png"><script defer src="../app-universal.js"></script>
  <title>Ecran senior - FamilyCare</title>
  <script>(function(){try{if(localStorage.getItem('familycare-theme')==='dark')document.documentElement.classList.add('dark-theme');}catch(e){}})();</script>
- <link rel="stylesheet" href="../styles/common.css?v=5.1.8">
- <link rel="stylesheet" href="../styles/senior-kiosk.css?v=5.1.8">
+ <link rel="stylesheet" href="../styles/common.css?v=5.1.9">
+ <link rel="stylesheet" href="../styles/senior-kiosk.css?v=5.1.9">
 </head>
 <body class="senior-kiosk-body senior-standalone">
  <main class="kiosk-page no-program-strip">
   <header class="kiosk-top">
-   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v5.1.8</span></div></div>
+   <div class="kiosk-brand"><img src="../assets/logo.svg" alt="FamilyCare"><div><b>FamilyCare</b><span>by Cademix · v5.1.9</span></div></div>
    <div class="kiosk-actions-top clean-top-actions sound-top-actions">
      <button id="themeBtn" class="theme-icon-button" type="button" aria-label="Activează tema întunecată" title="Activează tema întunecată">🌙</button>
-     <button id="languageBtn" type="button">RO</button>
      <button id="logoutBtn" class="logout-top-button" type="button" aria-label="Ieșire" title="Ieșire">Ieșire</button>
      <div class="kiosk-now" id="currentNow">Azi · --:--</div>
     </div>
@@ -109,7 +108,15 @@ function pad(n){return String(n).padStart(2,'0');}
 function jsWeekday(d){const n=d.getDay();return n===0?7:n;}
 function parseTime(t){const [h,m]=String(t||'09:00').slice(0,5).split(':').map(Number);return {h:h||0,m:m||0};}
 function dateOnly(s){if(!s)return null; const d=new Date(String(s).slice(0,10)+'T00:00:00'); return isNaN(d)?null:d;}
-function dayName(n){return ['','Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'][n]||'';}
+const UI_LANG=(localStorage.getItem('familycare-language')||'ro').toLowerCase();
+const I18N={
+ ro:{days:['','Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'],today:'astăzi',beneficiary:'Beneficiar',senior:'Senior',call:'Sună familia',message:'Trimite mesaj',help:'Am nevoie de ajutor',rights:'Drepturile mele',logout:'Ieșire'},
+ en:{days:['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],today:'today',beneficiary:'Beneficiary',senior:'Senior',call:'Call family',message:'Send message',help:'I need help',rights:'My rights',logout:'Sign out'},
+ es:{days:['','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'],today:'hoy',beneficiary:'Beneficiario',senior:'Mayor',call:'Llamar a la familia',message:'Enviar mensaje',help:'Necesito ayuda',rights:'Mis derechos',logout:'Salir'}
+};
+const TXT=I18N[UI_LANG]||I18N.ro;
+document.documentElement.lang=UI_LANG;
+function dayName(n){return TXT.days[n]||'';}
 function isSenior(e){return true;}
 function branchMatches(e){return true;}
 function startOfWeek(d){const copy=new Date(d.getFullYear(),d.getMonth(),d.getDate()); copy.setDate(copy.getDate()-(jsWeekday(copy)-1)); return copy;}
@@ -131,7 +138,7 @@ function keyFromTarget(t,target){const d=target||t.target||new Date();return `${
 function isAlreadyConfirmed(t){const status=String(t.status||'').toLowerCase();if(t.confirmed_at||status.includes('confirmat')||status.includes('confirmed'))return true;const key=t.occurrence_key||keyFromTarget(t,t.target);return confirmedKeys.has(key)||Boolean(resolvedDecisions[key]);}
 function severityClass(diff){if(diff<=0)return 'state-overdue'; if(diff<=5)return 'state-05'; if(diff<=10)return 'state-10'; if(diff<=20)return 'state-20'; if(diff<=30)return 'state-30'; return 'state-calm';}
 function clearSeverity(el){if(!el)return; el.classList.remove('state-calm','state-30','state-20','state-10','state-05','state-overdue','soon','urgent','alarm');}
-function updateClock(){const d=new Date(); const el=document.getElementById('currentNow'); if(el) el.textContent=`${dayName(jsWeekday(d))}, ${d.toLocaleDateString('ro-RO')} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
+function updateClock(){const d=new Date(); const el=document.getElementById('currentNow'); const locale=UI_LANG==='en'?'en-GB':UI_LANG==='es'?'es-ES':'ro-RO'; if(el) el.textContent=`${dayName(jsWeekday(d))}, ${d.toLocaleDateString(locale)} · ${pad(d.getHours())}:${pad(d.getMinutes())}`;}
 async function initSession(){
  try{session={...session,...JSON.parse(localStorage.getItem(SESSION_KEY)||'{}')}}catch(e){}
  try{
@@ -150,7 +157,7 @@ function cleanEntityName(e){const values=[e?.name,e?.display_name,e?.entity_name
 function mergeEntities(db){const source=[...(Array.isArray(db)?db:[])];const byCode=new Map();source.forEach(e=>{if(!e||!e.entity_code||!branchMatches(e)||(session.singleEntity&&session.entityCode&&e.entity_code!==session.entityCode))return;const clean={...e,name:cleanEntityName(e)};const previous=byCode.get(e.entity_code)||{};byCode.set(e.entity_code,{...previous,...clean,name:cleanEntityName({...previous,...clean})});});return [...byCode.values()].sort((a,b)=>String(a.name).localeCompare(String(b.name),'ro'));}
 async function loadEntities(){let items=[]; try{const r=await apiFetch('/api/senior/entities?ts='+Date.now()); if(r.ok) items=await r.json();}catch(e){} allEntities=mergeEntities(items); const visible=visibleEntities(); const preferred=session.preferredEntityCode||session.entityCode||''; if(!visible.some(e=>e.entity_code===selectedEntityCode)) selectedEntityCode=(preferred&&visible.some(e=>e.entity_code===preferred)?preferred:'')||(visible[0]&&visible[0].entity_code)||(allEntities[0]&&allEntities[0].entity_code)||''; renderSeniorCards();}
 
-function renderSeniorCards(){const box=document.getElementById('seniorCards'); const page=document.querySelector('.kiosk-page'); const shown=visibleEntities(); const count=shown.length; const phoneRows=Math.max(1,Math.ceil(count/2)); box.dataset.count=String(count); if(page){page.classList.toggle('many-seniors',count>4);page.dataset.seniorCount=String(count);page.style.setProperty('--senior-cards-height',(phoneRows*44+(phoneRows-1)*4)+'px');page.style.setProperty('--confirm-columns',String(Math.min(2,Math.max(1,count))));} box.innerHTML=shown.map((e,index)=>{const background=validCardColor(e.card_color,CARD_PALETTE[index%CARD_PALETTE.length]);const text=readableTextColor(background);const active=e.entity_code===selectedEntityCode;return `<button type="button" class="senior-person-card ${active?'active':''}" data-code="${safe(e.entity_code)}" aria-pressed="${active?'true':'false'}" style="--senior-card-bg:${background};--senior-card-text:${text}"><b>${safe(e.name)}</b><span>${safe(String(e.entity_type||'beneficiar').toLowerCase()==='senior'?'Senior':e.entity_type||'Beneficiar')}</span></button>`;}).join('')||'<div class="kiosk-empty">Nu există beneficiar afișat</div>'; box.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+function renderSeniorCards(){const box=document.getElementById('seniorCards'); const page=document.querySelector('.kiosk-page'); const shown=visibleEntities(); const count=shown.length; const phoneRows=Math.max(1,Math.ceil(count/2)); box.dataset.count=String(count); if(page){page.classList.toggle('many-seniors',count>4);page.dataset.seniorCount=String(count);page.style.setProperty('--senior-cards-height',(phoneRows*44+(phoneRows-1)*4)+'px');page.style.setProperty('--confirm-columns',String(Math.min(2,Math.max(1,count))));} box.innerHTML=shown.map((e,index)=>{const background=validCardColor(e.card_color,CARD_PALETTE[index%CARD_PALETTE.length]);const text=readableTextColor(background);const active=e.entity_code===selectedEntityCode;return `<button type="button" class="senior-person-card ${active?'active':''}" data-code="${safe(e.entity_code)}" aria-pressed="${active?'true':'false'}" style="--senior-card-bg:${background};--senior-card-text:${text};background-color:${background};color:${text}"><b>${safe(e.name)}</b><span>${safe(String(e.entity_type||'beneficiar').toLowerCase()==='senior'?TXT.senior:(e.entity_type||TXT.beneficiary))}</span></button>`;}).join('')||'<div class="kiosk-empty">Nu există beneficiar afișat</div>'; box.querySelectorAll('button').forEach(b=>b.onclick=()=>{
   selectedEntityCode=b.dataset.code;
   currentTreatment=null;
   renderSeniorCards();
@@ -160,7 +167,7 @@ function renderSeniorCards(){const box=document.getElementById('seniorCards'); c
   setTimeout(()=>focusConfirmZone(selectedEntityCode),40);
  });}
 
-function renderDayCards(){const today=jsWeekday(new Date()); const ordered=Array.from({length:7},(_,i)=>((today-1+i)%7)+1); document.getElementById('dayCards').innerHTML=ordered.map(n=>{const d=dateForWeekday(n); const isToday=n===today; return `<button type="button" class="kiosk-day ${n===selectedDay?'active':''}" data-day="${n}"><b>${dayName(n)}</b>${isToday?'<span class="day-today">astăzi</span>':''}<span class="day-date">${pad(d.getDate())}.${pad(d.getMonth()+1)}</span></button>`;}).join(''); document.querySelectorAll('.kiosk-day').forEach(btn=>btn.onclick=()=>{selectedDay=Number(btn.dataset.day); renderDayCards(); renderTreatments();});}
+function renderDayCards(){const today=jsWeekday(new Date()); const ordered=Array.from({length:7},(_,i)=>((today-1+i)%7)+1); document.getElementById('dayCards').innerHTML=ordered.map(n=>{const d=dateForWeekday(n); const isToday=n===today; return `<button type="button" class="kiosk-day ${n===selectedDay?'active':''}" data-day="${n}"><b>${dayName(n)}</b>${isToday?`<span class="day-today">${safe(TXT.today)}</span>`:''}<span class="day-date">${pad(d.getDate())}.${pad(d.getMonth()+1)}</span></button>`;}).join(''); document.querySelectorAll('.kiosk-day').forEach(btn=>btn.onclick=()=>{selectedDay=Number(btn.dataset.day); renderDayCards(); renderTreatments();});}
 function focusConfirmZone(entityCode){document.querySelectorAll('.confirm-zone').forEach(z=>z.classList.toggle('selected-senior', z.dataset.entity===entityCode)); const z=document.querySelector(`.confirm-zone[data-entity="${CSS.escape(entityCode||'')}"]`); if(z){z.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});}}
 function fallbackTreatments(){return [];}
 async function loadTreatments(){let list=[]; try{const r=await apiFetch('/api/treatment?ts='+Date.now()); if(r.ok) list=await r.json();}catch(e){} allTreatments=Array.isArray(list)?list:[]; renderTreatments();}
@@ -420,11 +427,16 @@ document.querySelectorAll('[data-score]').forEach(button=>button.onclick=()=>{sa
 document.getElementById('complaintForm').onsubmit=async event=>{event.preventDefault();const ok=await submitFeedback({type:'complaint',category:document.getElementById('complaintCategory').value,message:document.getElementById('complaintMessage').value.trim(),anonymous:document.getElementById('complaintAnonymous').checked});if(ok)event.target.reset();};
 document.getElementById('satisfactionForm').onsubmit=async event=>{event.preventDefault();if(!satisfactionScore){toast('Alege un număr de la 1 la 5.');return;}const ok=await submitFeedback({type:'satisfaction',category:'Calitatea serviciilor',score:satisfactionScore,message:document.getElementById('satisfactionMessage').value.trim(),anonymous:true});if(ok){event.target.reset();satisfactionScore=0;document.querySelectorAll('[data-score]').forEach(b=>b.classList.remove('selected'));}};
 
+function applyStoredLanguage(){
+ const logout=document.getElementById('logoutBtn'); if(logout){logout.textContent=TXT.logout;logout.title=TXT.logout;logout.setAttribute('aria-label',TXT.logout);}
+ const labels=document.querySelectorAll('.kiosk-action b');
+ const values=[TXT.call,TXT.message,TXT.help,TXT.rights]; labels.forEach((el,i)=>{if(values[i])el.textContent=values[i];});
+}
+applyStoredLanguage();
 const themeBtn=document.getElementById('themeBtn');
 function updateThemeButton(){if(!themeBtn)return;const isDark=document.documentElement.classList.contains('dark-theme');themeBtn.textContent=isDark?'☀️':'🌙';themeBtn.setAttribute('aria-label',isDark?'Activează tema luminoasă':'Activează tema întunecată');themeBtn.title=isDark?'Activează tema luminoasă':'Activează tema întunecată';}
 updateThemeButton();
 if(themeBtn) themeBtn.onclick=()=>{const isDark=document.documentElement.classList.toggle('dark-theme'); document.body.classList.toggle('dark-theme',isDark); localStorage.setItem('familycare-theme',isDark?'dark':'light'); updateThemeButton();};
-document.getElementById('languageBtn').onclick=()=>toast('Limba RO este activă.');
 const logoutBtn=document.getElementById('logoutBtn');
 if(logoutBtn) logoutBtn.onclick=async()=>{try{await apiFetch('/api/senior/logout',{method:'DELETE'});}catch(e){}localStorage.removeItem(SESSION_KEY);location.href='senior-login.html';};
 

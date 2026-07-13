@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#2563eb">
   <title>FamilyCare</title>
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles/common.css?v=5.1.8">
-  <link rel="stylesheet" href="/styles/access-v4.css?v=5.1.8">
+  <link rel="stylesheet" href="/styles/common.css?v=5.1.9">
+  <link rel="stylesheet" href="/styles/access-v4.css?v=5.1.9">
 </head>
 <body class="access-page">
-  <button id="themeBtn" class="theme-floating" type="button" aria-label="Schimbă tema">☾</button>
+  <div class="login-preferences"><label for="languageSelect" class="sr-only">Limbă</label><select id="languageSelect" aria-label="Limbă"><option value="ro">RO</option><option value="en">EN</option><option value="es">ES</option></select><button id="themeBtn" class="theme-floating" type="button" aria-label="Schimbă tema">☾</button></div>
 
   <main class="access-shell access-shell-clean">
     <section class="access-card access-card-clean">
@@ -18,7 +18,7 @@
         <div class="brand-mark" aria-hidden="true">FC</div>
         <div>
           <strong>FamilyCare</strong>
-          <span>v5.1.8</span>
+          <span>v5.1.9</span>
         </div>
       </header>
 
@@ -135,7 +135,7 @@
     </form>
   </dialog>
 
-  <script src="/app-universal.js?v=5.1.8"></script>
+  <script src="/app-universal.js?v=5.1.9"></script>
   <script>
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
     const setMsg=(selector,text,ok=false)=>{const e=$(selector);e.textContent=text||'';e.className='message '+(text?(ok?'ok':'error'):'')};
@@ -232,6 +232,14 @@
       const response=await fetch('/api/network/setup-pin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activationToken,...data})});
       const result=await response.json(); if(!response.ok)return setMsg('#pinMessage',result.error); location.href=result.redirect;
     });
-  </script>
+  
+const languageSelect=document.getElementById('languageSelect');
+if(languageSelect){
+  const savedLanguage=(localStorage.getItem('familycare-language')||'ro').toLowerCase();
+  languageSelect.value=['ro','en','es'].includes(savedLanguage)?savedLanguage:'ro';
+  document.documentElement.lang=languageSelect.value;
+  languageSelect.addEventListener('change',()=>{localStorage.setItem('familycare-language',languageSelect.value);document.documentElement.lang=languageSelect.value;location.reload();});
+}
+</script>
 </body>
 </html>
