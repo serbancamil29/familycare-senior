@@ -42,3 +42,24 @@
 html[data-theme="dark"] .login-preferences select,html.dark-theme .login-preferences select{background:#17233d;color:#f8fafc;border-color:#425274}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 @media(max-width:480px){.login-preferences{top:max(8px,env(safe-area-inset-top));right:max(8px,env(safe-area-inset-right));gap:5px}.login-preferences select{height:40px;min-width:58px;padding:0 7px}.login-preferences .theme-floating{width:40px!important;height:40px!important}}
+
+
+/* =========================================================
+   v5.2.0 — login controls inside card, mobile-safe
+   ========================================================= */
+.login-brand{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;min-width:0!important}
+.login-brand-main{display:flex;align-items:center;gap:12px;min-width:0}
+.login-preferences{position:static!important;inset:auto!important;z-index:auto!important;display:flex!important;align-items:center!important;gap:6px!important;flex:0 0 auto!important;margin-left:auto!important}
+.login-preferences select{height:40px!important;min-width:58px!important;width:auto!important;padding:0 8px!important;border-radius:12px!important;box-shadow:none!important}
+.login-preferences .theme-floating{position:static!important;inset:auto!important;width:40px!important;min-width:40px!important;height:40px!important;min-height:40px!important;margin:0!important;padding:0!important;border-radius:12px!important}
+@media(max-width:420px){
+ .access-card-clean{padding:14px!important}
+ .login-brand{align-items:flex-start!important}
+ .login-brand-main{gap:8px!important}
+ .brand-mark{width:38px!important;height:38px!important;min-width:38px!important}
+ .login-brand strong{font-size:17px!important}
+ .login-brand span{font-size:11px!important}
+ .login-preferences{gap:4px!important}
+ .login-preferences select{height:36px!important;min-width:52px!important;padding:0 5px!important;font-size:13px!important}
+ .login-preferences .theme-floating{width:36px!important;min-width:36px!important;height:36px!important;min-height:36px!important;font-size:17px!important}
+}
